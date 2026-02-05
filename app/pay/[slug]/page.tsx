@@ -4,52 +4,48 @@ import { useState } from 'react'
 
 export default function PayPage() {
   const params = useParams()
-  const slug = Array.isArray(params.slug) ? params.slug[0] : (params.slug as string || 'desconocido')
-  const [amount, setAmount] = useState<string>('')
+  const slug = typeof params?.slug === 'string' ? params.slug : 'comercio'
+  const [amount, setAmount] = useState('')
   const [loading, setLoading] = useState(false)
 
   const handlePay = async () => {
-    const numAmount = Number(amount)
-    if (!amount || numAmount <= 0) {
-      alert('Ingresá un importe válido')
-      return
-    }
+    if (!amount || Number(amount) <= 0) return alert('Monto inválido')
     setLoading(true)
     try {
       const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: numAmount, commerceName: slug }),
+        body: JSON.stringify({ amount: Number(amount), commerceName: slug }),
       })
       const data = await res.json()
       if (data.url) {
         window.location.href = data.url
       } else {
-        alert('Error: ' + (data.error || 'Inténtalo de nuevo'))
+        alert('Error en el servidor')
         setLoading(false)
       }
     } catch (err) {
-      alert('Error de conexión. Verifica tu internet.')
+      alert('Error de red')
       setLoading(false)
     }
   }
 
   return (
-    <div style={{ padding: '2rem', textAlign: 'center', maxWidth: '400px', margin: '0 auto' }}>
-      <h1>Cobrix Pay</h1>
-      <p>Comercio: {slug.toUpperCase()}</p>
+    <div style={{ padding: '50px', textAlign: 'center' }}>
+      <h1>Pagar a {slug.toUpperCase()}</h1>
       <input 
         type="number" 
         value={amount} 
         onChange={(e) => setAmount(e.target.value)} 
-        style={{ width: '100%', padding: '10px', marginBottom: '10px' }}
+        placeholder="Monto USD"
+        style={{ padding: '10px', display: 'block', margin: '10px auto' }}
       />
       <button 
         onClick={handlePay} 
         disabled={loading}
-        style={{ width: '100%', padding: '10px', background: '#635bff', color: 'white', border: 'none' }}
+        style={{ padding: '10px 20px', background: 'blue', color: 'white' }}
       >
-        {loading ? 'Redirigiendo...' : 'Pagar con Stripe'}
+        {loading ? 'Cargando...' : 'Pagar'}
       </button>
     </div>
   )
