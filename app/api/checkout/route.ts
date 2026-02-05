@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
 
-// ACTUALIZADO: Cambié la versión a 2026-01-28.clover para que coincida con tu proyecto
+// He cambiado la versión a '2026-01-28.clover' para que coincida con lo que te pide Vercel
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2026-01-28.clover' as any,
 })
