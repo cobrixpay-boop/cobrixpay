@@ -21,7 +21,6 @@ export default function PayPage() {
     setLoading(true)
 
     try {
-      // CORRECCIÓN: Se agregó la llave { que faltaba aquí abajo
       const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
