@@ -21,10 +21,11 @@ export default function PayPage() {
     setLoading(true)
 
     try {
-      const res = await fetch('/api/checkout',
+      // CORRECCIÓN: Se agregó la llave { que faltaba aquí abajo
+      const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: numAmount, slug }),
+        body: JSON.stringify({ amount: numAmount, commerceName: slug }),
       })
 
       if (!res.ok) {
@@ -42,7 +43,7 @@ export default function PayPage() {
       }
     } catch (err: any) {
       console.error('Error en handlePay:', err)
-      alert('Error: ' + (err.message || 'No se pudo conectar al servidor. Revisa consola F12.'))
+      alert('Error: ' + (err.message || 'No se pudo conectar al servidor.'))
       setLoading(false)
     }
   }
@@ -109,4 +110,3 @@ export default function PayPage() {
     </div>
   )
 }
-// Update forzada
