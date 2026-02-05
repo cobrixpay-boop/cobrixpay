@@ -60,11 +60,9 @@ export default function PayPage() {
       justifyContent: 'center'
     }}>
       <h1 style={{ color: '#635bff', marginBottom: '1.5rem' }}>Cobrix Pay</h1>
-
       <p style={{ fontSize: '1.3rem', marginBottom: '1.5rem', fontWeight: 600 }}>
         Comercio: {slug.replace(/-/g, ' ').toUpperCase()}
       </p>
-
       <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
         Monto en USD
       </label>
@@ -84,7 +82,6 @@ export default function PayPage() {
           marginBottom: '1.5rem'
         }}
       />
-
       <button
         onClick={handlePay}
         disabled={loading}
@@ -102,10 +99,6 @@ export default function PayPage() {
       >
         {loading ? 'Redirigiendo...' : 'Pagar con Stripe'}
       </button>
-
-      <p style={{ marginTop: '2rem', fontSize: '0.9rem', color: '#555' }}>
-        Pago seguro con tarjeta, Apple Pay o Google Pay
-      </p>
     </div>
   )
 }
