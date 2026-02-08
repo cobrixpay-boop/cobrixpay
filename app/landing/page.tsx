@@ -30,10 +30,10 @@ export default function LandingPage() {
       <header className="px-6 pt-12 pb-24 max-w-7xl mx-auto md:flex items-center">
         <div className="md:w-1/2 text-center md:text-left">
           <h1 className="text-5xl md:text-6xl font-extrabold tracking-tight leading-[1.1] text-[#1A1F2B]">
-            Cobrá a <span className="text-[#007AFF]">turistas</span> <br />como nunca antes.
+            Cobrá a <span className="text-[#007AFF]">turistas extranjeros</span> <br />como nunca antes.
           </h1>
           <p className="mt-6 text-lg text-slate-500 max-w-md leading-relaxed">
-            La infraestructura de pagos premium para comercios. Aceptá pagos globales en terminales sin burocracia.
+            La infraestructura de pagos premium para comercios. Aceptá pagos globales sin terminales sin burocracia.
           </p>
           
           {/* LOGOS DE PAGO */}
