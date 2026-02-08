@@ -1,102 +1,114 @@
 import React from 'react';
-import { ShieldCheck, Zap, Globe, Smartphone, CreditCard, CheckCircle2 } from 'lucide-react';
+import { ShieldCheck, Smartphone, CreditCard, ExternalLink } from 'lucide-react';
 
 export default function LandingPage() {
+  const whatsappLink = "https://wa.me/5491158809679?text=Hola!%20Vengo%20de%20la%20web%20y%20quiero%20solicitar%20el%20alta%20de%20mi%20comercio%20en%20Cobrix%20Pay.";
+
   return (
-    <div className="min-h-screen bg-white text-slate-900 font-sans">
+    <div className="min-h-screen bg-[#F8F9FB] text-slate-900 font-sans">
       {/* --- NAV --- */}
       <nav className="flex justify-between items-center px-6 py-6 max-w-7xl mx-auto">
-        <div className="text-2xl font-bold tracking-tighter text-blue-600">
-          COBRIX<span className="text-slate-400 font-light">PAY</span>
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 bg-green-400 rounded-full flex items-center justify-center text-white font-bold">✓</div>
+          <div className="text-2xl font-black tracking-tighter italic">
+            Cobrix<span className="text-[#00D18E]">Pay</span>
+          </div>
         </div>
-        <div className="hidden md:flex space-x-8 text-sm font-medium text-slate-600">
-          <a href="#beneficios" className="hover:text-blue-600 transition">Beneficios</a>
-          <a href="#seguridad" className="hover:text-blue-600 transition">Seguridad</a>
+        <div className="hidden md:flex space-x-8 text-sm font-semibold text-slate-500">
+          <a href="#beneficios" className="hover:text-slate-900 transition"># Beneficios</a>
+          <a href="#seguridad" className="hover:text-slate-900 transition"># Seguridad</a>
         </div>
         <a 
-          href="https://wa.me/TU_NUMERO_AQUI" 
-          className="bg-slate-900 text-white px-5 py-2 rounded-full text-sm font-semibold hover:bg-blue-600 transition"
+          href={whatsappLink}
+          className="bg-[#1A1F2B] text-white px-6 py-2 rounded-full text-sm font-bold hover:bg-slate-800 transition shadow-lg"
         >
           Contacto Comercial
         </a>
       </nav>
 
       {/* --- HERO SECTION --- */}
-      <header className="px-6 pt-16 pb-24 max-w-7xl mx-auto text-center md:text-left md:flex items-center">
-        <div className="md:w-1/2">
-          <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight leading-tight">
-            Cobrá a <span className="text-blue-600">turistas</span> como nunca antes.
+      <header className="px-6 pt-12 pb-24 max-w-7xl mx-auto md:flex items-center">
+        <div className="md:w-1/2 text-center md:text-left">
+          <h1 className="text-5xl md:text-6xl font-extrabold tracking-tight leading-[1.1] text-[#1A1F2B]">
+            Cobrá a <span className="text-[#007AFF]">turistas</span> <br />como nunca antes.
           </h1>
-          <p className="mt-6 text-lg text-slate-600 max-w-xl">
-            La infraestructura de pagos premium para comercios exclusivos en Buenos Aires. Aceptá pagos globales sin terminales ni burocracia.
+          <p className="mt-6 text-lg text-slate-500 max-w-md leading-relaxed">
+            La infraestructura de pagos premium para comercios. Aceptá pagos globales en terminales sin burocracia.
           </p>
           
           {/* LOGOS DE PAGO */}
-          <div className="mt-8 flex items-center justify-center md:justify-start gap-6 opacity-70">
-            <div className="flex flex-col items-center">
-              <Smartphone className="mb-1" />
-              <span className="text-[10px] font-bold">Apple Pay</span>
+          <div className="mt-10 flex items-center justify-center md:justify-start gap-6 border-t border-slate-200 pt-8">
+            <div className="flex flex-col items-center opacity-60">
+              <Smartphone size={20} />
+              <span className="text-[10px] font-bold mt-1 uppercase">Apple Pay</span>
             </div>
-            <div className="flex flex-col items-center">
-              <CreditCard className="mb-1" />
-              <span className="text-[10px] font-bold">Google Pay</span>
+            <div className="flex flex-col items-center opacity-60">
+              <CreditCard size={20} />
+              <span className="text-[10px] font-bold mt-1 uppercase">Google Pay</span>
             </div>
-            <div className="h-8 w-[1px] bg-slate-200 mx-2"></div>
+            <div className="h-10 w-[1px] bg-slate-200"></div>
             <div className="flex flex-col items-start">
-              <span className="text-[10px] uppercase tracking-widest text-slate-400">Powered by</span>
-              <span className="text-lg font-black text-slate-400 tracking-tighter italic">stripe</span>
+              <span className="text-[9px] uppercase tracking-[0.2em] text-slate-400 font-bold leading-none mb-1">Powered by</span>
+              <span className="text-2xl font-black text-slate-900 tracking-tighter italic leading-none">stripe</span>
             </div>
           </div>
 
           <div className="mt-10">
-            <button className="bg-blue-600 text-white px-8 py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-blue-700 transition w-full md:w-auto">
+            <a 
+              href={whatsappLink}
+              className="bg-[#1A1F2B] text-white px-10 py-4 rounded-full font-bold text-lg shadow-xl hover:scale-105 transition-transform inline-block"
+            >
               Solicitar Alta de Comercio
-            </button>
+            </a>
           </div>
         </div>
         
-        <div className="hidden md:block md:w-1/2 mt-12 md:mt-0 pl-12">
-          <div className="relative">
-            <div className="absolute -inset-4 bg-blue-100 rounded-full blur-3xl opacity-50"></div>
-            <div className="relative bg-white border border-slate-100 p-8 rounded-3xl shadow-2xl max-w-sm mx-auto transform rotate-2">
-               <div className="aspect-square bg-slate-50 rounded-2xl flex items-center justify-center border-2 border-dashed border-slate-200">
-                  <div className="text-center">
-                    <div className="bg-white p-4 shadow-sm rounded-lg mb-2">
-                       {/* Simulación visual de QR */}
-                       <div className="w-24 h-24 bg-slate-900 rounded flex items-center justify-center text-white font-bold text-xs">QR</div>
-                    </div>
-                    <span className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Cobrix Pay Terminal</span>
-                  </div>
+        {/* IMAGEN QR (Asegurate de tener qr-ejemplo.png en public/) */}
+        <div className="md:w-1/2 mt-16 md:mt-0 flex justify-center relative">
+          <div className="w-72 h-[500px] bg-white rounded-[3rem] shadow-2xl border-[8px] border-white overflow-hidden relative z-10">
+            <div className="bg-[#007AFF] h-24 flex items-center justify-center">
+               <span className="text-white font-bold tracking-widest text-xs uppercase">Cobrix Pay Terminal</span>
+            </div>
+            <div className="p-8 flex flex-col items-center justify-center h-full -mt-24">
+               <img src="/qr-ejemplo.png" alt="QR de ejemplo" className="w-full h-auto mb-6" />
+               <div className="bg-[#00D18E] text-white px-6 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest">
+                  Escaneá y Pagá
                </div>
             </div>
           </div>
+          {/* Círculo de fondo igual a tu imagen */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-blue-100 rounded-full blur-3xl opacity-40"></div>
         </div>
       </header>
 
-      {/* --- TRUST / SECURITY --- */}
-      <section id="seguridad" className="bg-slate-50 py-20 border-y border-slate-100">
+      {/* --- SECCIÓN SEGURIDAD --- */}
+      <section id="seguridad" className="bg-white py-24 border-y border-slate-100">
         <div className="max-w-4xl mx-auto px-6 text-center">
-          <div className="inline-flex items-center gap-2 bg-white border border-slate-200 px-4 py-2 rounded-full mb-6 shadow-sm">
-            <ShieldCheck size={20} className="text-blue-600" />
-            <span className="text-sm font-bold text-slate-700 italic underline">stripe</span>
-            <span className="text-sm font-medium text-slate-500">Official Partner</span>
+          <div className="inline-flex items-center gap-3 bg-slate-50 border border-slate-200 px-6 py-3 rounded-full mb-8">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Powered by</span>
+            <span className="text-xl font-black text-slate-900 tracking-tighter italic">stripe</span>
+            <span className="text-xs font-bold text-[#00D18E] ml-2">Official Partner</span>
           </div>
-          <h2 className="text-3xl font-bold italic">Seguridad de Clase Mundial</h2>
-          <p className="mt-4 text-slate-600 text-lg leading-relaxed">
-            Todas nuestras transacciones están procesadas y encriptadas por <strong>Stripe</strong>, líder global en pagos digitales. Cumplimos con los estándares PCI-DSS para garantizar que cada centavo de tu comercio esté protegido.
+          <h2 className="text-4xl font-extrabold text-[#1A1F2B]">Seguridad de Clase Mundial</h2>
+          <p className="mt-6 text-slate-500 text-lg leading-relaxed">
+            Todas nuestras transacciones están procesadas y encriptadas por <strong>Stripe</strong>. Cumplimos con los estándares internacionales <strong>PCI-DSS</strong> para garantizar que cada centavo de tu comercio esté protegido.
           </p>
         </div>
       </section>
 
-      {/* --- FOOTER LEGAL --- */}
-      <footer className="py-12 bg-white px-6">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
-          <div className="text-slate-400 text-xs">
-            © 2026 Cobrix Pay. Todos los derechos reservados.
+      {/* --- FOOTER --- */}
+      <footer className="py-16 bg-white px-6">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-8 border-t border-slate-100 pt-12">
+          <div>
+            <div className="text-slate-400 text-xs font-medium mb-2 uppercase tracking-widest">© 2026 Cobrix Pay. Todos los derechos reservados.</div>
+            <p className="text-slate-500 text-[11px] leading-relaxed max-w-md italic">
+              Cobrix Pay es una marca comercial operada por <span className="text-slate-900 font-bold">Digital Travel LLC</span>, una sociedad legalmente constituida en <span className="text-slate-900 font-bold">Nuevo México, EE.UU.</span>
+            </p>
           </div>
-          <div className="text-slate-500 text-[11px] max-w-lg text-center md:text-right leading-relaxed font-medium">
-            Cobrix Pay es una marca comercial operada por <span className="text-slate-800 font-bold">Digital Travel LLC</span>, una sociedad legalmente constituida en <span className="text-slate-800 font-bold">Nuevo México, EE.UU.</span> 
-            <br />La tecnología de procesamiento de pagos es provista por Stripe Inc.
+          <div className="flex gap-4">
+             <a href={whatsappLink} className="text-slate-400 hover:text-blue-600 transition flex items-center gap-1 text-xs font-bold uppercase">
+               Soporte <ExternalLink size={12} />
+             </a>
           </div>
         </div>
       </footer>
