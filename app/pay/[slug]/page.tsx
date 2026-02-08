@@ -21,11 +21,16 @@ export default function PayPage() {
     setLoading(true)
 
     try {
-      const res = await fetch('/api/checkout', {
+      const res = await fetch('https://cobrixpay.vercel.app/api/checkout', { // cambia a tu URL real en producción
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: numAmount, commerceName: slug }),
+        body: JSON.stringify({ amount: numAmount, slug }),
       })
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}))
+        throw new Error(errorData.error || `Error del servidor (${res.status})`)
+      }
 
       const data = await res.json()
 
@@ -37,7 +42,7 @@ export default function PayPage() {
       }
     } catch (err: any) {
       console.error('Error en handlePay:', err)
-      alert('Error de conexión. Reintentá en unos segundos.')
+      alert('Error: ' + (err.message || 'No se pudo conectar al servidor. Revisa consola F12.'))
       setLoading(false)
     }
   }
@@ -60,28 +65,25 @@ export default function PayPage() {
         Comercio: {slug.replace(/-/g, ' ').toUpperCase()}
       </p>
 
-      <div style={{ marginBottom: '1.5rem', textAlign: 'left' }}>
-        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold', color: '#444' }}>
-          Monto en USD
-        </label>
-        <input
-          type="number"
-          placeholder="0.00"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          min="1"
-          step="0.01"
-          style={{
-            width: '100%',
-            padding: '14px',
-            fontSize: '1.2rem',
-            border: '2px solid #e0e0e0',
-            borderRadius: '12px',
-            boxSizing: 'border-box',
-            outline: 'none'
-          }}
-        />
-      </div>
+      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+        Monto en USD
+      </label>
+      <input
+        type="number"
+        placeholder="Ej: 25.00"
+        value={amount}
+        onChange={(e) => setAmount(e.target.value)}
+        min="1"
+        step="0.01"
+        style={{
+          width: '100%',
+          padding: '14px',
+          fontSize: '1.2rem',
+          border: '1px solid #ccc',
+          borderRadius: '8px',
+          marginBottom: '1.5rem'
+        }}
+      />
 
       <button
         onClick={handlePay}
@@ -93,17 +95,16 @@ export default function PayPage() {
           background: loading ? '#aaa' : '#635bff',
           color: 'white',
           border: 'none',
-          borderRadius: '12px',
+          borderRadius: '8px',
           cursor: loading ? 'not-allowed' : 'pointer',
-          fontWeight: 600,
-          transition: 'background 0.2s'
+          fontWeight: 600
         }}
       >
         {loading ? 'Redirigiendo...' : 'Pagar con Stripe'}
       </button>
 
-      <p style={{ marginTop: '2rem', fontSize: '0.9rem', color: '#666' }}>
-        🔒 Pago seguro procesado por Stripe
+      <p style={{ marginTop: '2rem', fontSize: '0.9rem', color: '#555' }}>
+        Pago seguro con tarjeta, Apple Pay o Google Pay
       </p>
     </div>
   )
