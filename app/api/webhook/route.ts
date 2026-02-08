@@ -1,45 +1,52 @@
-import { NextResponse } from 'next/server';
-import { Resend } from 'resend';
-import Stripe from 'stripe';
+import { NextResponse } from 'next/server'
+import Stripe from 'stripe'
+import { Resend } from 'resend'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2025-01-27' as any });
-const resend = new Resend(process.env.RESEND_API_KEY);
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: '2026-01-28.clover',
+})
+
+const resend = new Resend(process.env.RESEND_API_KEY!)
+
+const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
 
 export async function POST(req: Request) {
-  const body = await req.text();
-  const signature = req.headers.get('stripe-signature')!;
+  const sig = req.headers.get('stripe-signature')!
+
+  let event
 
   try {
-    // Validamos el evento (Asegúrate de que STRIPE_WEBHOOK_SECRET sea el de 'Cuentas Conectadas')
-    const event = stripe.webhooks.constructEvent(body, signature, process.env.STRIPE_WEBHOOK_SECRET!);
-
-    if (event.type === 'checkout.session.completed') {
-      const session = event.data.object as Stripe.Checkout.Session;
-      const amount = session.amount_total ? session.amount_total / 100 : 0;
-      const customerEmail = session.customer_details?.email;
-
-      // 1. Mail al Comercio (Estudio Ontivero)
-      await resend.emails.send({
-        from: 'Cobrix Pay <onboarding@resend.dev>', // Cámbialo por tu dominio cuando lo verifiques
-        to: 'contador.ontivero@gmail.com',
-        subject: '¡Nuevo cobro recibido!',
-        html: `<p>Has recibido un nuevo pago de <strong>$${amount} USD</strong> a través de Cobrix Pay.</p>`
-      });
-
-      // 2. Mail al Cliente
-      if (customerEmail) {
-        await resend.emails.send({
-          from: 'Cobrix Pay <onboarding@resend.dev>',
-          to: customerEmail,
-          subject: 'Recibo de tu pago',
-          html: `<p>Gracias por tu pago de $${amount} USD. Tu transacción fue procesada con éxito.</p>`
-        });
-      }
-    }
-
-    return NextResponse.json({ received: true });
-  } catch (err: any) {
-    console.error(`Webhook Error: ${err.message}`);
-    return NextResponse.json({ error: err.message }, { status: 400 });
+    const body = await req.text()
+    event = stripe.webhooks.constructEvent(body, sig, webhookSecret)
+  } catch (err) {
+    console.error('Webhook Error:', err.message)
+    return NextResponse.json({ error: 'Webhook Error' }, { status: 400 })
   }
+
+  if (event.type === 'payment_intent.succeeded') {
+    const paymentIntent = event.data.object
+    const amount = paymentIntent.amount / 100
+
+    await resend.emails.send({
+      from: 'Cobrix Pay <noreply@cobrixpay.com>',
+      to: 'contador.ontivero@gmail.com',
+      subject: 'Pago recibido ✅',
+      text: `Se recibió un pago de USD ${amount} para el comercio ${event.data.object.metadata?.slug || 'desconocido'}. ID: ${paymentIntent.id}`,
+    })
+  }
+
+  if (event.type === 'payment_intent.payment_failed') {
+    const paymentIntent = event.data.object
+    const amount = paymentIntent.amount / 100
+    const reason = paymentIntent.last_payment_error?.message || 'Motivo desconocido'
+
+    await resend.emails.send({
+      from: 'Cobrix Pay <noreply@cobrixpay.com>',
+      to: 'contador.ontivero@gmail.com',
+      subject: 'Pago rechazado ❌',
+      text: `Pago de USD ${amount} rechazado. Motivo: ${reason}. ID: ${paymentIntent.id}`,
+    })
+  }
+
+  return NextResponse.json({ received: true })
 }

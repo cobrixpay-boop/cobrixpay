@@ -21,7 +21,7 @@ export default function PayPage() {
     setLoading(true)
 
     try {
-      const res = await fetch('https://cobrixpay.vercel.app/api/checkout', { // cambia a tu URL real en producción
+      const res = await fetch('https://cobrixpay.vercel.app/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ amount: numAmount, slug }),
