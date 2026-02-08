@@ -38,7 +38,7 @@ function SuccessContent() {
         </p>
       </div>
 
-      <Link href="/" style={{
+      <Link href="/landing" style={{
         textDecoration: 'none',
         color: 'white',
         background: '#635bff',
@@ -47,7 +47,7 @@ function SuccessContent() {
         fontWeight: 'bold',
         display: 'inline-block'
       }}>
-        Volver al inicio
+        Finalizar
       </Link>
     </div>
   )
