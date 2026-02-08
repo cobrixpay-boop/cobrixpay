@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, Zap, Globe, Smartphone, CreditCard } from 'lucide-react';
+import { ShieldCheck, Zap, Globe, Smartphone, CreditCard, CheckCircle2 } from 'lucide-react';
 
 export default function LandingPage() {
   return (
@@ -17,7 +17,7 @@ export default function LandingPage() {
           href="https://wa.me/TU_NUMERO_AQUI" 
           className="bg-slate-900 text-white px-5 py-2 rounded-full text-sm font-semibold hover:bg-blue-600 transition"
         >
-          Contacto
+          Contacto Comercial
         </a>
       </nav>
 
@@ -28,84 +28,75 @@ export default function LandingPage() {
             Cobrá a <span className="text-blue-600">turistas</span> como nunca antes.
           </h1>
           <p className="mt-6 text-lg text-slate-600 max-w-xl">
-            La solución premium para comercios en Buenos Aires. Aceptá Apple Pay y Google Pay con una tasa fija del 4%. Sin terminales, sin burocracia.
+            La infraestructura de pagos premium para comercios exclusivos en Buenos Aires. Aceptá pagos globales sin terminales ni burocracia.
           </p>
-          <div className="mt-10 flex flex-col sm:flex-row gap-4">
-            <button className="bg-blue-600 text-white px-8 py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-blue-700 transition">
-              Obtener mi QR
-            </button>
-            <div className="flex items-center gap-3 px-4">
-              <div className="flex -space-x-2">
-                {/* Placeholder para logos de Apple/Google Pay */}
-                <span className="w-10 h-10 bg-slate-100 border border-white rounded-full flex items-center justify-center text-[10px] font-bold">Pay</span>
-                <span className="w-10 h-10 bg-slate-100 border border-white rounded-full flex items-center justify-center text-[10px] font-bold">GPay</span>
-              </div>
-              <span className="text-sm text-slate-500 font-medium">Compatible con billeteras globales</span>
+          
+          {/* LOGOS DE PAGO */}
+          <div className="mt-8 flex items-center justify-center md:justify-start gap-6 opacity-70">
+            <div className="flex flex-col items-center">
+              <Smartphone className="mb-1" />
+              <span className="text-[10px] font-bold">Apple Pay</span>
+            </div>
+            <div className="flex flex-col items-center">
+              <CreditCard className="mb-1" />
+              <span className="text-[10px] font-bold">Google Pay</span>
+            </div>
+            <div className="h-8 w-[1px] bg-slate-200 mx-2"></div>
+            <div className="flex flex-col items-start">
+              <span className="text-[10px] uppercase tracking-widest text-slate-400">Powered by</span>
+              <span className="text-lg font-black text-slate-400 tracking-tighter italic">stripe</span>
             </div>
           </div>
+
+          <div className="mt-10">
+            <button className="bg-blue-600 text-white px-8 py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-blue-700 transition w-full md:w-auto">
+              Solicitar Alta de Comercio
+            </button>
+          </div>
         </div>
+        
         <div className="hidden md:block md:w-1/2 mt-12 md:mt-0 pl-12">
           <div className="relative">
             <div className="absolute -inset-4 bg-blue-100 rounded-full blur-3xl opacity-50"></div>
-            <div className="relative bg-white border border-slate-100 p-8 rounded-3xl shadow-2xl max-w-sm mx-auto transform rotate-3">
-               {/* Simulación de un QR en la landing */}
+            <div className="relative bg-white border border-slate-100 p-8 rounded-3xl shadow-2xl max-w-sm mx-auto transform rotate-2">
                <div className="aspect-square bg-slate-50 rounded-2xl flex items-center justify-center border-2 border-dashed border-slate-200">
-                  <span className="text-slate-300 text-sm italic font-mono text-center px-4">QR de Cobrix Pay para tu local</span>
-               </div>
-               <div className="mt-6 space-y-2">
-                 <div className="h-4 bg-slate-100 rounded w-3/4"></div>
-                 <div className="h-4 bg-slate-50 rounded w-1/2"></div>
+                  <div className="text-center">
+                    <div className="bg-white p-4 shadow-sm rounded-lg mb-2">
+                       {/* Simulación visual de QR */}
+                       <div className="w-24 h-24 bg-slate-900 rounded flex items-center justify-center text-white font-bold text-xs">QR</div>
+                    </div>
+                    <span className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Cobrix Pay Terminal</span>
+                  </div>
                </div>
             </div>
           </div>
         </div>
       </header>
 
-      {/* --- FEATURES --- */}
-      <section id="beneficios" className="bg-slate-50 py-24">
-        <div className="max-w-7xl mx-auto px-6 grid md:grid-cols-3 gap-12">
-          <div className="space-y-4">
-            <div className="bg-blue-600 w-12 h-12 rounded-xl flex items-center justify-center text-white">
-              <Zap size={24} />
-            </div>
-            <h3 className="text-xl font-bold">Pagos Instantáneos</h3>
-            <p className="text-slate-600">Tus clientes escanean y pagan en segundos. Sin demoras en la caja ni fricción en el ticket alto.</p>
+      {/* --- TRUST / SECURITY --- */}
+      <section id="seguridad" className="bg-slate-50 py-20 border-y border-slate-100">
+        <div className="max-w-4xl mx-auto px-6 text-center">
+          <div className="inline-flex items-center gap-2 bg-white border border-slate-200 px-4 py-2 rounded-full mb-6 shadow-sm">
+            <ShieldCheck size={20} className="text-blue-600" />
+            <span className="text-sm font-bold text-slate-700 italic underline">stripe</span>
+            <span className="text-sm font-medium text-slate-500">Official Partner</span>
           </div>
-          <div className="space-y-4">
-            <div className="bg-blue-600 w-12 h-12 rounded-xl flex items-center justify-center text-white">
-              <Globe size={24} />
-            </div>
-            <h3 className="text-xl font-bold">Alcance Global</h3>
-            <p className="text-slate-600">Aceptamos tarjetas de todo el mundo. Ideal para el turismo internacional en CABA.</p>
-          </div>
-          <div className="space-y-4">
-            <div className="bg-blue-600 w-12 h-12 rounded-xl flex items-center justify-center text-white">
-              <CreditCard size={24} />
-            </div>
-            <h3 className="text-xl font-bold">Comisión Transparente</h3>
-            <p className="text-slate-600">4% final por transacción. Sin costos fijos, sin mantenimiento, sin sorpresas.</p>
-          </div>
+          <h2 className="text-3xl font-bold italic">Seguridad de Clase Mundial</h2>
+          <p className="mt-4 text-slate-600 text-lg leading-relaxed">
+            Todas nuestras transacciones están procesadas y encriptadas por <strong>Stripe</strong>, líder global en pagos digitales. Cumplimos con los estándares PCI-DSS para garantizar que cada centavo de tu comercio esté protegido.
+          </p>
         </div>
       </section>
 
-      {/* --- TRUST / SECURITY --- */}
-      <section id="seguridad" className="py-24 max-w-4xl mx-auto px-6 text-center">
-        <ShieldCheck size={48} className="mx-auto text-green-500 mb-6" />
-        <h2 className="text-3xl font-bold">Seguridad de Clase Mundial</h2>
-        <p className="mt-4 text-slate-600 text-lg">
-          Cobrix Pay utiliza la tecnología de <strong>Stripe</strong> para procesar cada pago. Tus datos y los de tus clientes están protegidos bajo los estándares de seguridad más altos de la industria (PCI-DSS).
-        </p>
-      </section>
-
       {/* --- FOOTER LEGAL --- */}
-      <footer className="border-t border-slate-100 py-12 bg-white px-6">
+      <footer className="py-12 bg-white px-6">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
-          <div className="text-slate-400 text-sm">
+          <div className="text-slate-400 text-xs">
             © 2026 Cobrix Pay. Todos los derechos reservados.
           </div>
-          <div className="text-slate-500 text-[11px] max-w-md text-center md:text-right leading-relaxed font-medium">
-            Cobrix Pay es una marca comercial operada por <span className="text-slate-800">Digital Travel LLC</span>, una sociedad constituida en [Tu Estado], EE.UU. 
-            Todas las transacciones son procesadas de forma segura.
+          <div className="text-slate-500 text-[11px] max-w-lg text-center md:text-right leading-relaxed font-medium">
+            Cobrix Pay es una marca comercial operada por <span className="text-slate-800 font-bold">Digital Travel LLC</span>, una sociedad legalmente constituida en <span className="text-slate-800 font-bold">Nuevo México, EE.UU.</span> 
+            <br />La tecnología de procesamiento de pagos es provista por Stripe Inc.
           </div>
         </div>
       </footer>
