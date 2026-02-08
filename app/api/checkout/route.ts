@@ -7,7 +7,7 @@ console.log('=== CHECKOUT BACKEND INICIADO ===')
 const STRIPE_KEY = 'sk_live_tuclave_real_live_aquí_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX'
 
 const stripe = new Stripe(STRIPE_KEY, {
-  apiVersion: '2024-06-20',  // ← Versión estable y válida (no 2025)
+  apiVersion: '2026-01-28.clover',  // ← Esta es la versión que tu proyecto espera
 })
 
 export async function POST(req: Request) {
