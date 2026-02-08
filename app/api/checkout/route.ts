@@ -1,57 +1,56 @@
-import { NextResponse } from 'next/server';
-import Stripe from 'stripe';
+import Stripe from 'stripe'
+import { NextResponse } from 'next/server'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-01-27' as any,
-});
+console.log('=== CHECKOUT BACKEND INICIADO ===')
 
-// BASE DE DATOS DE COMERCIOS
-const COMERCIOS: Record<string, { stripeId: string; nombre: string; email: string; comision: number }> = {
-  "estudio-ontivero": {
-    stripeId: "acct_1S74Q2KNskANs8tN",
-    nombre: "Estudio Ontivero",
-    email: "contador.ontivero@gmail.com",
-    comision: 0.04 // 4% de comisión para Cobrix Pay
-  },
-  // Para agregar más, solo copias el bloque anterior aquí abajo
-};
+// Usa tu clave LIVE real aquí (sk_live_...)
+const STRIPE_KEY = 'sk_live_tuclave_real_live_aquí_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX'
+
+const stripe = new Stripe(STRIPE_KEY, {
+  apiVersion: '2024-06-20',  // ← Versión estable y válida (no 2025)
+})
 
 export async function POST(req: Request) {
   try {
-    const { amount, slug } = await req.json();
-    const comercio = COMERCIOS[slug];
+    const body = await req.json()
+    console.log('Body recibido:', body)
 
-    if (!comercio) {
-      return NextResponse.json({ error: 'Comercio no encontrado' }, { status: 404 });
+    const { amount, slug } = body
+
+    if (!amount || Number(amount) <= 0) {
+      return NextResponse.json({ error: 'Monto inválido' }, { status: 400 })
     }
+
+    console.log('Creando sesión con amount:', amount, 'slug:', slug)
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
-      line_items: [{
-        price_data: {
-          currency: 'usd',
-          unit_amount: Math.round(amount * 100),
-          product_data: {
-            name: `Pago a ${comercio.nombre}`,
-            description: "Servicio procesado por Cobrix Pay",
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: `Pago a ${slug || 'Cobrix Pay'}`,
+            },
+            unit_amount: Math.round(Number(amount) * 100),
           },
+          quantity: 1,
         },
-        quantity: 1,
-      }],
-      payment_intent_data: {
-        // Cálculo automático de tu comisión
-        application_fee_amount: Math.round((amount * 100) * comercio.comision),
-        transfer_data: {
-          destination: comercio.stripeId,
-        },
-      },
-      success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/success?session_id={CHECKOUT_SESSION_ID}&slug=${slug}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/pay/${slug}`,
-    });
+      ],
+      success_url: `${req.headers.get('origin') || 'https://cobrixpay.vercel.app'}/success`,
+      cancel_url: `${req.headers.get('origin') || 'https://cobrixpay.vercel.app'}/cancel`,
+    })
 
-    return NextResponse.json({ id: session.id });
-  } catch (err: any) {
-    console.error("Error en Checkout:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.log('Sesión creada OK:', session.id)
+    console.log('URL:', session.url)
+
+    return NextResponse.json({ url: session.url })
+  } catch (error: any) {
+    console.error('ERROR EN CHECKOUT:', error.message || error.toString())
+    return NextResponse.json(
+      { error: 'Error interno', details: error.message || 'Desconocido' },
+      { status: 500 }
+    )
   }
 }
