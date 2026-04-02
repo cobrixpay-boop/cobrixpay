@@ -28,7 +28,7 @@ export async function POST(req: Request) {
 
     await resend.emails.send({
       from: 'Cobrix Pay <onboarding@resend.dev>',
-      to: 'contador.ontivero@gmail.com',
+      to: 'cobrixpay@gmail.com',
       subject: `Pago recibido ✅ - ${amount} USD`,
       text: `¡Hola!
 Se recibió un pago de USD ${amount}.
@@ -46,7 +46,7 @@ Martín`,
 
     await resend.emails.send({
       from: 'Cobrix Pay <onboarding@resend.dev>',
-      to: 'contador.ontivero@gmail.com',
+      to: 'cobrixpay@gmail.com',
       subject: `Pago rechazado ❌ - ${amount} USD`,
       text: `Pago de USD ${amount} rechazado.
 Motivo: ${reason}
