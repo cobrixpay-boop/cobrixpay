@@ -27,7 +27,7 @@ export async function POST(req: Request) {
     const amount = paymentIntent.amount / 100
 
     await resend.emails.send({
-      from: 'Cobrix Pay <onboarding@resend.dev>',
+      from: 'Cobrix Pay <notificaciones@cobrixpay.com>' ,
       to: 'cobrixpay@gmail.com',
       subject: `Pago recibido ✅ - ${amount} USD`,
       text: `¡Hola!
@@ -45,7 +45,7 @@ Martín`,
     const reason = paymentIntent.last_payment_error?.message || 'Motivo desconocido'
 
     await resend.emails.send({
-      from: 'Cobrix Pay <onboarding@resend.dev>',
+      from: 'Cobrix Pay <notificaciones@cobrixpay.com> ,
       to: 'cobrixpay@gmail.com',
       subject: `Pago rechazado ❌ - ${amount} USD`,
       text: `Pago de USD ${amount} rechazado.
