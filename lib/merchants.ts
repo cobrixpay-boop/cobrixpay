@@ -5,6 +5,7 @@ export type Merchant = {
   slug: string
   name: string
   email: string
+  notificationEmails: string[]
   stripeAccountId?: string
 }
 
@@ -13,6 +14,7 @@ const defaultMerchants: Record<string, Merchant> = {
     slug: 'cobrix',
     name: 'Cobrix Pay',
     email: 'notificaciones@cobrixpay.com',
+    notificationEmails: ['notificaciones@cobrixpay.com'],
   },
 }
 
@@ -21,10 +23,21 @@ function normalizeSlug(slug: string) {
 }
 
 function normalizeMerchantRecord(merchant: any, key: string): Merchant {
+  const email = merchant.email || ''
+  const notificationEmails = Array.isArray(merchant.notificationEmails)
+    ? merchant.notificationEmails.map((value: any) => String(value).trim()).filter(Boolean)
+    : email
+    ? String(email)
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean)
+    : []
+
   return {
     slug: normalizeSlug(merchant.slug || key),
     name: merchant.name,
-    email: merchant.email,
+    email,
+    notificationEmails,
     stripeAccountId: merchant.stripeAccountId,
   }
 }

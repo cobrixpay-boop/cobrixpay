@@ -8,15 +8,23 @@ function normalizeSlug(slug: string) {
   return slug.trim().toLowerCase()
 }
 
-function normalizeSlug(slug: string) {
-  return slug.trim().toLowerCase()
-}
 
 function normalizeMerchantRecord(merchant: any, key: string) {
+  const email = merchant.email || ''
+  const notificationEmails = Array.isArray(merchant.notificationEmails)
+    ? merchant.notificationEmails.map((value: any) => String(value).trim()).filter(Boolean)
+    : email
+    ? String(email)
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean)
+    : []
+
   return {
     slug: normalizeSlug(merchant.slug || key),
     name: merchant.name,
-    email: merchant.email,
+    email,
+    notificationEmails,
     stripeAccountId: merchant.stripeAccountId,
   }
 }
@@ -41,7 +49,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { slug, name, email, stripeAccountId } = body
+    const { slug, name, email, stripeAccountId, notificationEmails } = body
     const normalizedSlug = slug ? normalizeSlug(slug) : ''
 
     if (!normalizedSlug || !name || !email) {
@@ -54,10 +62,26 @@ export async function POST(req: Request) {
     }
 
     const prev = merchants[normalizedSlug] || {}
+    const parsedNotificationEmails = Array.isArray(notificationEmails)
+      ? notificationEmails.map((value: any) => String(value).trim()).filter(Boolean)
+      : typeof notificationEmails === 'string' && notificationEmails.length > 0
+      ? notificationEmails
+          .split(',')
+          .map((value: string) => value.trim())
+          .filter(Boolean)
+      : prev.notificationEmails ||
+        (email
+          ? String(email)
+              .split(',')
+              .map((value: string) => value.trim())
+              .filter(Boolean)
+          : [])
+
     merchants[normalizedSlug] = {
       slug: normalizedSlug,
       name,
       email,
+      notificationEmails: parsedNotificationEmails,
       stripeAccountId: stripeAccountId?.toString().trim() || prev.stripeAccountId,
     }
     fs.writeFileSync(dataPath, JSON.stringify(merchants, null, 2), 'utf-8')

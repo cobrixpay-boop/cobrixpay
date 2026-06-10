@@ -3,20 +3,31 @@ import Stripe from 'stripe'
 import { Resend } from 'resend'
 import { getMerchantBySlug } from '../../../lib/merchants'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2026-01-28.clover',
-})
+function getStripe() {
+  return new Stripe(process.env.STRIPE_SECRET_KEY!, {
+    apiVersion: '2026-02-25.clover',
+  })
+}
 
-const resend = new Resend(process.env.RESEND_API_KEY!)
+function getResend() {
+  return new Resend(process.env.RESEND_API_KEY!)
+}
 
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
+function getWebhookSecret() {
+  const secret = process.env.STRIPE_WEBHOOK_SECRET
+  if (!secret) {
+    throw new Error('Missing STRIPE_WEBHOOK_SECRET')
+  }
+  return secret
+}
 
 function getBuyerEmail(paymentIntent: Stripe.PaymentIntent) {
   const charge = (paymentIntent as any).charges?.data?.[0]
   return paymentIntent.receipt_email || charge?.billing_details?.email
 }
 
-async function sendEmail(to: string, subject: string, text: string) {
+async function sendEmail(to: string | string[], subject: string, text: string) {
+  const resend = getResend()
   return resend.emails.send({
     from: 'Cobrix Pay <notificaciones@cobrixpay.com>',
     to,
@@ -31,7 +42,9 @@ export async function POST(req: Request) {
   let event
 
   try {
+    const stripe = getStripe()
     const body = await req.text()
+    const webhookSecret = getWebhookSecret()
     event = stripe.webhooks.constructEvent(body, sig, webhookSecret)
   } catch (err) {
     return NextResponse.json({ error: 'Webhook Error' }, { status: 400 })
@@ -40,14 +53,19 @@ export async function POST(req: Request) {
   const paymentIntent = event.data.object as Stripe.PaymentIntent
   const merchantSlug = paymentIntent.metadata?.merchantSlug as string | undefined
   const merchant = getMerchantBySlug(merchantSlug)
-  const merchantEmail = merchant?.email || process.env.DEFAULT_MERCHANT_EMAIL || 'cobrixpay@gmail.com'
+  const merchantEmails =
+    merchant?.notificationEmails && merchant.notificationEmails.length > 0
+      ? merchant.notificationEmails
+      : merchant?.email
+      ? [merchant.email]
+      : [process.env.DEFAULT_MERCHANT_EMAIL || 'cobrixpay@gmail.com']
   const merchantName = merchant?.name || merchantSlug?.replace(/-/g, ' ') || 'Cobrix Pay'
   const buyerEmail = getBuyerEmail(paymentIntent)
   const amount = paymentIntent.amount / 100
 
   if (event.type === 'payment_intent.succeeded') {
     const merchantPromise = sendEmail(
-      merchantEmail,
+      merchantEmails,
       `Pago recibido ✅ - ${amount} USD`,
       `¡Hola ${merchantName}!
 Se recibió un pago de USD ${amount}.
@@ -76,15 +94,17 @@ Martín`
   if (event.type === 'payment_intent.payment_failed') {
     const reason = paymentIntent.last_payment_error?.message || 'Motivo desconocido'
 
-    const merchantPromise = sendEmail(
-      merchantEmail,
-      `Pago rechazado ❌ - ${amount} USD`,
-      `Hola ${merchantName}.
+    const failedMessage = `Hola ${merchantName}.
 Un pago de USD ${amount} fue rechazado.
 Motivo: ${reason}
 ID: ${paymentIntent.id}
 Saludos,
 Martín`
+
+    const merchantPromise = sendEmail(
+      merchantEmails,
+      `Pago rechazado ❌ - ${amount} USD`,
+      failedMessage
     )
 
     const buyerPromise = buyerEmail

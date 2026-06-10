@@ -2,13 +2,16 @@ import Stripe from 'stripe'
 import { NextResponse } from 'next/server'
 import { getMerchantBySlug } from '../../../lib/merchants'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2026-01-28.clover',
-})
+function getStripe() {
+  return new Stripe(process.env.STRIPE_SECRET_KEY!, {
+    apiVersion: '2026-02-25.clover',
+  })
+}
 
 function getBaseUrl() {
   return (
     process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.NEXT_PUBLIC_BASE_URL ||
     process.env.APP_URL ||
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
   )
@@ -38,6 +41,7 @@ export async function POST(req: Request) {
       }
     }
 
+    const stripe = getStripe()
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       payment_method_types: ['card'],

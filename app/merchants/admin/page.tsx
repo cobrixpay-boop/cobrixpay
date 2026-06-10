@@ -2,13 +2,14 @@
 
 import { FormEvent, useEffect, useState } from 'react'
 
-type Merchant = { slug: string; name: string; email: string; stripeAccountId?: string }
+type Merchant = { slug: string; name: string; email: string; notificationEmails?: string[]; stripeAccountId?: string }
 
 export default function AdminMerchants() {
   const [merchants, setMerchants] = useState<Record<string, Merchant>>({})
   const [slug, setSlug] = useState('')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
+  const [notificationEmails, setNotificationEmails] = useState('')
   const [stripeAccountId, setStripeAccountId] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -31,7 +32,7 @@ export default function AdminMerchants() {
       const res = await fetch('/api/merchants', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug, name, email, stripeAccountId }),
+        body: JSON.stringify({ slug, name, email, notificationEmails, stripeAccountId }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Error')
@@ -77,6 +78,16 @@ export default function AdminMerchants() {
           />
         </div>
         <div style={{ marginBottom: 12 }}>
+          <label style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>Emails de notificación</label>
+          <input
+            value={notificationEmails}
+            onChange={(e) => setNotificationEmails(e.target.value)}
+            placeholder="correo1@ejemplo.com, correo2@ejemplo.com"
+            style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid #ccc' }}
+          />
+          <small style={{ color: '#666' }}>Separá múltiples correos con comas.</small>
+        </div>
+        <div style={{ marginBottom: 12 }}>
           <label style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>Stripe Account ID</label>
           <input
             value={stripeAccountId}
@@ -110,6 +121,11 @@ export default function AdminMerchants() {
               <li key={merchant.slug} style={{ marginBottom: 12, padding: 12, background: '#f8f9ff', borderRadius: 10 }}>
                 <strong>{merchant.name}</strong>
                 <div>{merchant.email}</div>
+                {merchant.notificationEmails && merchant.notificationEmails.length > 0 && (
+                  <div style={{ color: '#555' }}>
+                    Notificaciones: {merchant.notificationEmails.join(', ')}
+                  </div>
+                )}
                 {merchant.stripeAccountId && <div style={{ color: '#555' }}>Stripe: {merchant.stripeAccountId}</div>}
                 <div style={{ color: '#555' }}>slug: {merchant.slug}</div>
               </li>
