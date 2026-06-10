@@ -1,17 +1,41 @@
 import Stripe from 'stripe'
 import { NextResponse } from 'next/server'
+import { getMerchantBySlug } from '../../../lib/merchants'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2026-01-28.clover',
 })
 
+function getBaseUrl() {
+  return (
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.APP_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
+  )
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json()
     const { amount, slug } = body
+    const merchant = getMerchantBySlug(slug)
+    const merchantSlug = merchant?.slug || slug || 'cobrix'
 
     if (!amount || Number(amount) <= 0) {
       return NextResponse.json({ error: 'Monto inválido' }, { status: 400 })
+    }
+
+    const baseUrl = getBaseUrl()
+    const paymentIntentData: any = {
+      metadata: {
+        merchantSlug,
+      },
+    }
+
+    if (merchant?.stripeAccountId) {
+      paymentIntentData.transfer_data = {
+        destination: merchant.stripeAccountId,
+      }
     }
 
     const session = await stripe.checkout.sessions.create({
@@ -22,15 +46,16 @@ export async function POST(req: Request) {
           price_data: {
             currency: 'usd',
             product_data: {
-              name: `Pago a ${slug || 'Cobrix Pay'}`,
+              name: `Pago a ${merchant?.name || slug || 'Cobrix Pay'}`,
             },
             unit_amount: Math.round(Number(amount) * 100),
           },
           quantity: 1,
         },
       ],
-      success_url: 'https://cobrixpay.vercel.app/success',
-      cancel_url: 'https://cobrixpay.vercel.app/cancel',
+      payment_intent_data: paymentIntentData,
+      success_url: `${baseUrl}/success`,
+      cancel_url: `${baseUrl}/cancel`,
     })
 
     return NextResponse.json({ url: session.url })

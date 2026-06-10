@@ -1,14 +1,22 @@
 'use client'
 
-import { useParams } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useParams, useSearchParams } from 'next/navigation'
 
 export default function PayPage() {
   const params = useParams()
+  const searchParams = useSearchParams()
   const slug = Array.isArray(params.slug) ? params.slug[0] : (params.slug as string || 'desconocido')
+  const initialAmount = searchParams.get('amount') || ''
 
-  const [amount, setAmount] = useState<string>('')
+  const [amount, setAmount] = useState<string>(initialAmount)
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (initialAmount) {
+      setAmount(initialAmount)
+    }
+  }, [initialAmount])
 
   const handlePay = async () => {
     const numAmount = Number(amount)
@@ -21,7 +29,7 @@ export default function PayPage() {
     setLoading(true)
 
     try {
-      const res = await fetch('https://cobrixpay.vercel.app/api/checkout', {
+      const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ amount: numAmount, slug }),
