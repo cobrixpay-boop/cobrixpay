@@ -27,6 +27,7 @@ export default function AdminMerchants() {
   const [stripeAccountId, setStripeAccountId] = useState('')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
+  const [baseUrl, setBaseUrl] = useState('')
 
   function getAdminHeaders(): Record<string, string> {
     return adminToken ? { 'x-admin-token': adminToken } : {}
@@ -61,6 +62,7 @@ export default function AdminMerchants() {
 
   useEffect(() => {
     const storedToken = window.localStorage.getItem('cobrix-admin-token') || ''
+    setBaseUrl(window.location.origin)
     setAdminToken(storedToken)
     fetchStorageStatus()
     fetchMerchants(storedToken)
@@ -248,7 +250,7 @@ export default function AdminMerchants() {
                 )}
                 {merchant.stripeAccountId && <div style={{ color: '#555' }}>Stripe: {merchant.stripeAccountId}</div>}
                 <div style={{ color: '#555' }}>slug: {merchant.slug}</div>
-                <div style={{ color: '#555' }}>link: /pay/{merchant.slug}</div>
+                <div style={{ color: '#555' }}>link: {baseUrl}/pay/{merchant.slug}</div>
               </li>
             ))}
           </ul>
