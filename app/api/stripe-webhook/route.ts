@@ -26,6 +26,18 @@ function getBuyerEmail(paymentIntent: Stripe.PaymentIntent) {
   return paymentIntent.receipt_email || charge?.billing_details?.email
 }
 
+async function getMerchantSlug(stripe: Stripe, paymentIntent: Stripe.PaymentIntent) {
+  const metadataSlug = paymentIntent.metadata?.merchantSlug
+  if (metadataSlug) return metadataSlug
+
+  const sessions = await stripe.checkout.sessions.list({
+    payment_intent: paymentIntent.id,
+    limit: 1,
+  })
+
+  return sessions.data[0]?.metadata?.merchantSlug || sessions.data[0]?.client_reference_id || undefined
+}
+
 async function sendEmail(to: string | string[], subject: string, text: string) {
   const resend = getResend()
   return resend.emails.send({
@@ -36,13 +48,22 @@ async function sendEmail(to: string | string[], subject: string, text: string) {
   })
 }
 
+async function sendNotifications(label: string, notifications: Array<Promise<unknown>>) {
+  const results = await Promise.allSettled(notifications)
+  results.forEach((result) => {
+    if (result.status === 'rejected') {
+      console.error(`Error enviando email de ${label}:`, result.reason)
+    }
+  })
+}
+
 export async function POST(req: Request) {
   const sig = req.headers.get('stripe-signature')!
+  const stripe = getStripe()
 
   let event
 
   try {
-    const stripe = getStripe()
     const body = await req.text()
     const webhookSecret = getWebhookSecret()
     event = stripe.webhooks.constructEvent(body, sig, webhookSecret)
@@ -51,7 +72,7 @@ export async function POST(req: Request) {
   }
 
   const paymentIntent = event.data.object as Stripe.PaymentIntent
-  const merchantSlug = paymentIntent.metadata?.merchantSlug as string | undefined
+  const merchantSlug = await getMerchantSlug(stripe, paymentIntent)
   const merchant = await getMerchantBySlug(merchantSlug)
   const merchantEmails =
     merchant?.notificationEmails && merchant.notificationEmails.length > 0
@@ -88,7 +109,7 @@ Martín`
         )
       : Promise.resolve()
 
-    await Promise.all([merchantPromise, buyerPromise])
+    await sendNotifications('pago aprobado', [merchantPromise, buyerPromise])
   }
 
   if (event.type === 'payment_intent.payment_failed') {
@@ -121,7 +142,7 @@ Martín`
         )
       : Promise.resolve()
 
-    await Promise.all([merchantPromise, buyerPromise])
+    await sendNotifications('pago rechazado', [merchantPromise, buyerPromise])
   }
 
   return NextResponse.json({ received: true })
