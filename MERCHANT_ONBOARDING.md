@@ -60,8 +60,9 @@ Si elegís Upstash, agrega estas variables en Vercel:
 
 - `UPSTASH_REDIS_REST_URL`
 - `UPSTASH_REDIS_REST_TOKEN`
+- `ADMIN_TOKEN`
 
-Luego la app usará Upstash para persistir los comercios en producción.
+Luego la app usará Upstash para persistir los comercios en producción. El formulario `/merchants/admin` pedirá `ADMIN_TOKEN` antes de listar o crear comercios.
 
 ## Nota sobre Stripe Connect
 

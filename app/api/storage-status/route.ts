@@ -6,5 +6,6 @@ export async function GET() {
   return NextResponse.json({
     storage,
     usesUpstash: usesUpstash(),
+    adminAuthRequired: Boolean(process.env.ADMIN_TOKEN),
   })
 }

@@ -1,8 +1,19 @@
 import { NextResponse } from 'next/server'
 import { listMerchants, saveMerchant } from '../../../lib/merchants'
 
+function isAuthorized(req: Request) {
+  const adminToken = process.env.ADMIN_TOKEN
+  if (!adminToken) return true
+
+  return req.headers.get('x-admin-token') === adminToken
+}
+
 function normalizeSlug(slug: string) {
-  return slug.trim().toLowerCase()
+  return slug
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-_]/g, '')
 }
 
 function normalizeNotificationEmails(notificationEmails: any, fallbackEmail: string) {
@@ -20,8 +31,12 @@ function normalizeNotificationEmails(notificationEmails: any, fallbackEmail: str
   return fallbackEmail ? [fallbackEmail] : []
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    if (!isAuthorized(req)) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
     const merchants = await listMerchants()
     return NextResponse.json(merchants)
   } catch (err) {
@@ -31,16 +46,24 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    if (!isAuthorized(req)) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
     const body = await req.json()
     const { slug, name, email, stripeAccountId, notificationEmails } = body
     const normalizedSlug = slug ? normalizeSlug(slug) : ''
+    const normalizedStripeAccountId = stripeAccountId?.toString().trim() || ''
 
-    if (!normalizedSlug || !name || !email) {
+    if (!normalizedSlug || !name || !email || !normalizedStripeAccountId) {
       return NextResponse.json({ error: 'Faltan campos' }, { status: 400 })
     }
 
+    if (!normalizedStripeAccountId.startsWith('acct_')) {
+      return NextResponse.json({ error: 'El Stripe Account ID debe empezar con acct_' }, { status: 400 })
+    }
+
     const merchants = await listMerchants()
-    const prev = merchants[normalizedSlug]
     const parsedNotificationEmails = normalizeNotificationEmails(notificationEmails, email)
 
     const merchant = {
@@ -48,7 +71,7 @@ export async function POST(req: Request) {
       name,
       email,
       notificationEmails: parsedNotificationEmails,
-      stripeAccountId: stripeAccountId?.toString().trim() || prev?.stripeAccountId,
+      stripeAccountId: normalizedStripeAccountId,
     }
 
     await saveMerchant(merchant)
