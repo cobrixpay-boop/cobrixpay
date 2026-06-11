@@ -5,6 +5,24 @@ import { Redis } from '@upstash/redis'
 const STORAGE_KEY = 'cobrix:merchants'
 let upstashClient: Redis | undefined
 
+function parseStoredMerchants(raw: unknown): Record<string, any> {
+  if (!raw) return {}
+
+  if (typeof raw === 'string') {
+    try {
+      return JSON.parse(raw)
+    } catch {
+      return {}
+    }
+  }
+
+  if (typeof raw === 'object' && !Array.isArray(raw)) {
+    return raw as Record<string, any>
+  }
+
+  return {}
+}
+
 function getLocalDataPath() {
   return path.join(process.cwd(), 'data', 'merchants.json')
 }
@@ -42,12 +60,7 @@ function getUpstashClient() {
 export async function readMerchantStorage(): Promise<Record<string, any>> {
   if (usesUpstash()) {
     const raw = await getUpstashClient().get(STORAGE_KEY)
-    if (!raw) return {}
-    try {
-      return JSON.parse(raw as string)
-    } catch {
-      return {}
-    }
+    return parseStoredMerchants(raw)
   }
 
   ensureLocalDataFile()

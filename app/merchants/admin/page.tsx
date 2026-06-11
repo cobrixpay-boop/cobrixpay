@@ -45,7 +45,10 @@ export default function AdminMerchants() {
     if (res.status === 401) {
       setMerchants({})
       setMessage('Ingresa el token de administrador para ver y crear comercios.')
+      return
     }
+
+    setMessage('No se pudieron cargar los comercios.')
   }
 
   async function fetchStorageStatus() {
@@ -66,6 +69,7 @@ export default function AdminMerchants() {
   function handleTokenChange(value: string) {
     setAdminToken(value)
     window.localStorage.setItem('cobrix-admin-token', value)
+    fetchMerchants(value)
   }
 
   function normalizeSlug(value: string) {
@@ -94,6 +98,7 @@ export default function AdminMerchants() {
       setEmail('')
       setNotificationEmails('')
       setStripeAccountId('')
+      setMerchants((current) => ({ ...current, [data.merchant.slug]: data.merchant }))
       await fetchMerchants()
       setMessage(`Comercio creado: /pay/${data.merchant.slug}`)
     } catch (err: any) {
@@ -217,6 +222,20 @@ export default function AdminMerchants() {
 
       <section style={{ marginTop: 32 }}>
         <h2>Comercios existentes</h2>
+        <button
+          type="button"
+          onClick={() => fetchMerchants()}
+          style={{
+            marginTop: 4,
+            padding: '8px 12px',
+            background: '#fff',
+            border: '1px solid #ccc',
+            borderRadius: 8,
+            cursor: 'pointer',
+          }}
+        >
+          Actualizar lista
+        </button>
         <div style={{ marginTop: 12 }}>
           {Object.keys(merchants).length === 0 && <p>No hay comercios.</p>}
           <ul style={{ listStyle: 'none', padding: 0 }}>
