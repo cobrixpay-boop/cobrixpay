@@ -6,6 +6,7 @@ export type Merchant = {
   email: string
   notificationEmails: string[]
   stripeAccountId?: string
+  applicationFeePercent?: number
 }
 
 const defaultMerchants: Record<string, Merchant> = {
@@ -38,6 +39,7 @@ function normalizeMerchantRecord(merchant: any, key: string): Merchant {
     email,
     notificationEmails,
     stripeAccountId: merchant.stripeAccountId,
+    applicationFeePercent: Number(merchant.applicationFeePercent || 0),
   }
 }
 

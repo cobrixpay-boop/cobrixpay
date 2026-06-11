@@ -8,6 +8,7 @@ type Merchant = {
   email: string
   notificationEmails?: string[]
   stripeAccountId?: string
+  applicationFeePercent?: number
 }
 
 type StorageStatus = {
@@ -25,9 +26,11 @@ export default function AdminMerchants() {
   const [email, setEmail] = useState('')
   const [notificationEmails, setNotificationEmails] = useState('')
   const [stripeAccountId, setStripeAccountId] = useState('')
+  const [applicationFeePercent, setApplicationFeePercent] = useState('0')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [baseUrl, setBaseUrl] = useState('')
+  const [editingSlug, setEditingSlug] = useState('')
 
   function getAdminHeaders(): Record<string, string> {
     return adminToken ? { 'x-admin-token': adminToken } : {}
@@ -81,6 +84,27 @@ export default function AdminMerchants() {
       .replace(/[^a-z0-9-_]/g, '')
   }
 
+  function fillForm(merchant: Merchant) {
+    setEditingSlug(merchant.slug)
+    setSlug(merchant.slug)
+    setName(merchant.name)
+    setEmail(merchant.email)
+    setNotificationEmails(merchant.notificationEmails?.join(', ') || '')
+    setStripeAccountId(merchant.stripeAccountId || '')
+    setApplicationFeePercent(String(merchant.applicationFeePercent || 0))
+    setMessage(`Editando comercio: ${merchant.slug}`)
+  }
+
+  function resetForm() {
+    setEditingSlug('')
+    setSlug('')
+    setName('')
+    setEmail('')
+    setNotificationEmails('')
+    setStripeAccountId('')
+    setApplicationFeePercent('0')
+  }
+
   async function handleCreate(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setLoading(true)
@@ -90,19 +114,15 @@ export default function AdminMerchants() {
       const res = await fetch('/api/merchants', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getAdminHeaders() },
-        body: JSON.stringify({ slug, name, email, notificationEmails, stripeAccountId }),
+        body: JSON.stringify({ slug, name, email, notificationEmails, stripeAccountId, applicationFeePercent }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Error')
 
-      setSlug('')
-      setName('')
-      setEmail('')
-      setNotificationEmails('')
-      setStripeAccountId('')
+      resetForm()
       setMerchants((current) => ({ ...current, [data.merchant.slug]: data.merchant }))
       await fetchMerchants()
-      setMessage(`Comercio creado: /pay/${data.merchant.slug}`)
+      setMessage(`${editingSlug ? 'Comercio actualizado' : 'Comercio creado'}: /pay/${data.merchant.slug}`)
     } catch (err: any) {
       setMessage('Error: ' + (err.message || 'No se pudo crear el comercio'))
     }
@@ -160,6 +180,7 @@ export default function AdminMerchants() {
             onChange={(e) => setSlug(normalizeSlug(e.target.value))}
             placeholder="mi-comercio"
             required
+            disabled={Boolean(editingSlug)}
             style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid #ccc' }}
           />
         </div>
@@ -205,6 +226,21 @@ export default function AdminMerchants() {
             style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid #ccc' }}
           />
         </div>
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>Comision Cobrix (%)</label>
+          <input
+            value={applicationFeePercent}
+            onChange={(e) => setApplicationFeePercent(e.target.value)}
+            type="number"
+            min="0"
+            max="100"
+            step="0.01"
+            placeholder="0"
+            required
+            style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid #ccc' }}
+          />
+          <small style={{ color: '#666' }}>Se aplica como application_fee_amount en cada pago.</small>
+        </div>
         <button
           type="submit"
           disabled={loading}
@@ -217,8 +253,24 @@ export default function AdminMerchants() {
             cursor: loading ? 'not-allowed' : 'pointer',
           }}
         >
-          {loading ? 'Guardando...' : 'Crear Comercio'}
+          {loading ? 'Guardando...' : editingSlug ? 'Guardar cambios' : 'Crear Comercio'}
         </button>
+        {editingSlug && (
+          <button
+            type="button"
+            onClick={resetForm}
+            style={{
+              marginLeft: 8,
+              padding: '12px 20px',
+              background: '#fff',
+              border: '1px solid #ccc',
+              borderRadius: 8,
+              cursor: 'pointer',
+            }}
+          >
+            Cancelar edicion
+          </button>
+        )}
         {message && <p style={{ marginTop: 12, color: message.startsWith('Error') ? '#b00020' : '#1b5e20' }}>{message}</p>}
       </form>
 
@@ -249,8 +301,23 @@ export default function AdminMerchants() {
                   <div style={{ color: '#555' }}>Notificaciones: {merchant.notificationEmails.join(', ')}</div>
                 )}
                 {merchant.stripeAccountId && <div style={{ color: '#555' }}>Stripe: {merchant.stripeAccountId}</div>}
+                <div style={{ color: '#555' }}>Comision Cobrix: {merchant.applicationFeePercent || 0}%</div>
                 <div style={{ color: '#555' }}>slug: {merchant.slug}</div>
                 <div style={{ color: '#555' }}>link: {baseUrl}/pay/{merchant.slug}</div>
+                <button
+                  type="button"
+                  onClick={() => fillForm(merchant)}
+                  style={{
+                    marginTop: 8,
+                    padding: '8px 12px',
+                    background: '#fff',
+                    border: '1px solid #ccc',
+                    borderRadius: 8,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Editar
+                </button>
               </li>
             ))}
           </ul>

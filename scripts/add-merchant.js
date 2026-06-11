@@ -61,6 +61,7 @@ function main() {
   const email = args.email || args.e
   const stripeAccountId = args.stripeAccountId || args.stripe || args.accountId
   const notificationEmails = args.notificationEmails || args.notification || args.notify
+  const applicationFeePercent = args.applicationFeePercent || args.feePercent || args.fee || 0
   const slug = normalizeSlug(args.slug || args.s || name)
 
   if (!name) {
@@ -87,6 +88,12 @@ function main() {
   const merchants = readMerchants(merchantsPath)
 
   const parsedNotificationEmails = parseNotificationEmails(notificationEmails, email)
+  const parsedApplicationFeePercent = Number(applicationFeePercent)
+
+  if (!Number.isFinite(parsedApplicationFeePercent) || parsedApplicationFeePercent < 0 || parsedApplicationFeePercent > 100) {
+    console.error('Error: la comision debe ser un numero entre 0 y 100. Usa --applicationFeePercent 5')
+    process.exit(1)
+  }
 
   merchants[slug] = {
     slug,
@@ -94,6 +101,7 @@ function main() {
     email,
     notificationEmails: parsedNotificationEmails,
     stripeAccountId: stripeAccountId.trim(),
+    applicationFeePercent: parsedApplicationFeePercent,
   }
 
   writeMerchants(merchantsPath, merchants)

@@ -31,6 +31,13 @@ function normalizeNotificationEmails(notificationEmails: any, fallbackEmail: str
   return fallbackEmail ? [fallbackEmail] : []
 }
 
+function normalizeApplicationFeePercent(value: any) {
+  if (value === undefined || value === null || value === '') return 0
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) return NaN
+  return Math.max(0, Math.min(100, parsed))
+}
+
 export async function GET(req: Request) {
   try {
     if (!isAuthorized(req)) {
@@ -51,9 +58,10 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json()
-    const { slug, name, email, stripeAccountId, notificationEmails } = body
+    const { slug, name, email, stripeAccountId, notificationEmails, applicationFeePercent } = body
     const normalizedSlug = slug ? normalizeSlug(slug) : ''
     const normalizedStripeAccountId = stripeAccountId?.toString().trim() || ''
+    const normalizedApplicationFeePercent = normalizeApplicationFeePercent(applicationFeePercent)
 
     if (!normalizedSlug || !name || !email || !normalizedStripeAccountId) {
       return NextResponse.json({ error: 'Faltan campos' }, { status: 400 })
@@ -61,6 +69,10 @@ export async function POST(req: Request) {
 
     if (!normalizedStripeAccountId.startsWith('acct_')) {
       return NextResponse.json({ error: 'El Stripe Account ID debe empezar con acct_' }, { status: 400 })
+    }
+
+    if (Number.isNaN(normalizedApplicationFeePercent)) {
+      return NextResponse.json({ error: 'La comision debe ser un numero' }, { status: 400 })
     }
 
     const merchants = await listMerchants()
@@ -72,6 +84,7 @@ export async function POST(req: Request) {
       email,
       notificationEmails: parsedNotificationEmails,
       stripeAccountId: normalizedStripeAccountId,
+      applicationFeePercent: normalizedApplicationFeePercent,
     }
 
     await saveMerchant(merchant)

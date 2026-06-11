@@ -29,15 +29,26 @@ export async function POST(req: Request) {
     }
 
     const baseUrl = getBaseUrl()
+    const amountInCents = Math.round(Number(amount) * 100)
+    const applicationFeePercent = merchant?.applicationFeePercent || 0
+    const applicationFeeAmount = Math.min(
+      amountInCents,
+      Math.max(0, Math.round((amountInCents * applicationFeePercent) / 100))
+    )
     const paymentIntentData: any = {
       metadata: {
         merchantSlug,
+        applicationFeePercent: String(applicationFeePercent),
       },
     }
 
     if (merchant?.stripeAccountId) {
       paymentIntentData.transfer_data = {
         destination: merchant.stripeAccountId,
+      }
+
+      if (applicationFeeAmount > 0) {
+        paymentIntentData.application_fee_amount = applicationFeeAmount
       }
     }
 
@@ -56,7 +67,7 @@ export async function POST(req: Request) {
             product_data: {
               name: `Pago a ${merchant?.name || slug || 'Cobrix Pay'}`,
             },
-            unit_amount: Math.round(Number(amount) * 100),
+            unit_amount: amountInCents,
           },
           quantity: 1,
         },

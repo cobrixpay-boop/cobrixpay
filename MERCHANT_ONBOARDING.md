@@ -9,6 +9,7 @@ Para dar de alta un comercio de forma sencilla y confiable, recolectá estos cam
 - `email`: Correo principal del comercio.
 - `notificationEmails`: Correos adicionales que deben recibir notificaciones de pagos. Si no se envía, se usa `email`.
 - `stripeAccountId`: Stripe Connect Account ID (debe comenzar con `acct_...`).
+- `applicationFeePercent`: Porcentaje de comisión Cobrix para ese comercio. Se convierte a `application_fee_amount` en cada pago.
 
 ## Método recomendado para replicarlo
 
@@ -22,7 +23,8 @@ node scripts/add-merchant.js \
   --slug mi-comercio \
   --email contacto@micomercio.com \
   --notificationEmails "ventas@micomercio.com, contabilidad@micomercio.com" \
-  --stripeAccountId acct_1Example
+  --stripeAccountId acct_1Example \
+  --applicationFeePercent 5
 ```
 
 ### Ejemplo mínimo
@@ -32,7 +34,8 @@ node scripts/add-merchant.js \
   --name "Estudio Ontivero" \
   --slug estudio-ontivero \
   --email contador.ontivero@gmail.com \
-  --stripeAccountId acct_1234567890abcdef
+  --stripeAccountId acct_1234567890abcdef \
+  --applicationFeePercent 5
 ```
 
 El script crea o actualiza la entrada en `data/merchants.json`.
@@ -41,8 +44,9 @@ El script crea o actualiza la entrada en `data/merchants.json`.
 
 1. Abrí `/merchants/admin` en tu app.
 2. Confirmá que el comercio aparece en la lista.
-3. Probá una sesión de pago con `/pay/<slug>`.
-4. Verificá que los emails lleguen al cliente y a los correos del comercio.
+3. Usá el botón `Editar` para cambiar la comisión si necesitás modificarla luego.
+4. Probá una sesión de pago con `/pay/<slug>`.
+5. Verificá que los emails lleguen al cliente y a los correos del comercio.
 
 ## Nota sobre despliegue en Vercel y almacenamiento
 
@@ -67,5 +71,6 @@ Luego la app usará Upstash para persistir los comercios en producción. El form
 ## Nota sobre Stripe Connect
 
 - `stripeAccountId` es obligatorio para enviar los pagos al comercio conectado.
+- `applicationFeePercent` define la comisión de la plataforma. Por ejemplo, `5` en un pago de USD 100 genera `application_fee_amount` de USD 5.
 - Si el comercio no tiene cuenta conectada, debe crearla en Stripe Connect y luego te pasa el `acct_...`.
 - Sin `stripeAccountId`, el pago se procesa en tu cuenta de plataforma, pero no se transfiere automáticamente al comercio.
