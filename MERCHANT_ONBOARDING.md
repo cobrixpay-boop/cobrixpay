@@ -50,10 +50,9 @@ El script crea o actualiza la entrada en `data/merchants.json`.
 - En Vercel, la carpeta de la aplicación se monta como solo lectura en ejecución y no se pueden escribir archivos en `/var/task`.
 - Por eso, el formulario de alta de comercio solo funciona en desarrollo local a menos que haya almacenamiento persistente.
 - Para producción necesitas:
-  - Vercel KV, o
   - Upstash Redis, o
   - otro backend persistente (base de datos, Supabase, PlanetScale, etc.)
-- Si no encontrás Vercel KV en el Marketplace, lo mejor es usar Upstash Redis, ya que está disponible como integración en Vercel.
+- Lo recomendado para este proyecto es usar Upstash Redis, disponible como integración en Vercel.
 
 ### Variables para Upstash Redis
 
@@ -62,7 +61,7 @@ Si elegís Upstash, agrega estas variables en Vercel:
 - `UPSTASH_REDIS_REST_URL`
 - `UPSTASH_REDIS_REST_TOKEN`
 
-Luego la app usará Upstash en lugar de Vercel KV.
+Luego la app usará Upstash para persistir los comercios en producción.
 
 ## Nota sobre Stripe Connect
 

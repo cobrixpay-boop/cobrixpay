@@ -1,6 +1,5 @@
 import fs from 'fs'
 import path from 'path'
-import { kv } from '@vercel/kv'
 import { Redis } from '@upstash/redis'
 
 const STORAGE_KEY = 'cobrix:merchants'
@@ -19,10 +18,6 @@ function ensureLocalDataFile() {
   if (!fs.existsSync(dataPath)) {
     fs.writeFileSync(dataPath, JSON.stringify({}, null, 2), 'utf-8')
   }
-}
-
-export function usesKv() {
-  return Boolean(process.env.VERCEL_KV_URL && process.env.VERCEL_KV_TOKEN)
 }
 
 export function usesUpstash() {
@@ -45,16 +40,6 @@ function getUpstashClient() {
 }
 
 export async function readMerchantStorage(): Promise<Record<string, any>> {
-  if (usesKv()) {
-    const raw = await kv.get<string | null>(STORAGE_KEY)
-    if (!raw) return {}
-    try {
-      return JSON.parse(raw)
-    } catch {
-      return {}
-    }
-  }
-
   if (usesUpstash()) {
     const raw = await getUpstashClient().get(STORAGE_KEY)
     if (!raw) return {}
@@ -72,11 +57,6 @@ export async function readMerchantStorage(): Promise<Record<string, any>> {
 }
 
 export async function writeMerchantStorage(data: Record<string, any>): Promise<void> {
-  if (usesKv()) {
-    await kv.set(STORAGE_KEY, JSON.stringify(data))
-    return
-  }
-
   if (usesUpstash()) {
     await getUpstashClient().set(STORAGE_KEY, JSON.stringify(data))
     return

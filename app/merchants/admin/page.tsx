@@ -5,8 +5,7 @@ import { FormEvent, useEffect, useState } from 'react'
 type Merchant = { slug: string; name: string; email: string; notificationEmails?: string[]; stripeAccountId?: string }
 
 type StorageStatus = {
-  storage: 'vercel-kv' | 'upstash' | 'local-file'
-  usesKv: boolean
+  storage: 'upstash' | 'local-file'
   usesUpstash?: boolean
 }
 
@@ -70,12 +69,11 @@ export default function AdminMerchants() {
 
       <form onSubmit={handleCreate} style={{ marginTop: 16 }}>
         {storageStatus && (
-          <div style={{ marginBottom: 16, padding: 12, borderRadius: 8, background: storageStatus.usesKv || storageStatus.usesUpstash ? '#e8f5e9' : '#fff3e0', border: storageStatus.usesKv || storageStatus.usesUpstash ? '1px solid #4caf50' : '1px solid #ff9800' }}>
-            <strong>Modo de persistencia:</strong> {storageStatus.storage === 'vercel-kv' ? 'Vercel KV' : storageStatus.storage === 'upstash' ? 'Upstash Redis' : 'Archivo local'}
+          <div style={{ marginBottom: 16, padding: 12, borderRadius: 8, background: storageStatus.usesUpstash ? '#e8f5e9' : '#fff3e0', border: storageStatus.usesUpstash ? '1px solid #4caf50' : '1px solid #ff9800' }}>
+            <strong>Modo de persistencia:</strong> {storageStatus.storage === 'upstash' ? 'Upstash Redis' : 'Archivo local'}
             <div style={{ marginTop: 4, color: '#333', fontSize: '0.9em' }}>
-              {storageStatus.usesKv && 'Los comercios se guardarán en Vercel KV. Funciona en producción.'}
               {storageStatus.usesUpstash && 'Los comercios se guardarán en Upstash Redis. Funciona en producción.'}
-              {!storageStatus.usesKv && !storageStatus.usesUpstash && (
+              {!storageStatus.usesUpstash && (
                 <>
                   Los comercios se guardan localmente en <code>data/merchants.json</code>.
                   <br />
