@@ -52,7 +52,7 @@ export async function POST(req: Request) {
 
   const paymentIntent = event.data.object as Stripe.PaymentIntent
   const merchantSlug = paymentIntent.metadata?.merchantSlug as string | undefined
-  const merchant = getMerchantBySlug(merchantSlug)
+  const merchant = await getMerchantBySlug(merchantSlug)
   const merchantEmails =
     merchant?.notificationEmails && merchant.notificationEmails.length > 0
       ? merchant.notificationEmails

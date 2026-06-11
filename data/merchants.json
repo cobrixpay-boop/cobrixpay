@@ -1,13 +1,1 @@
-{
-  "cobrix": {
-    "slug": "cobrix",
-    "name": "Cobrix Pay",
-    "email": "notificaciones@cobrixpay.com"
-  },
-  "estudio-ontivero": {
-    "slug": "estudio-ontivero",
-    "name": "Estudio Ontivero",
-    "email": "contador.ontivero@gmail.com",
-    "stripeAccountId": "acct_1234567890abcdef"
-  }
-}
+{}

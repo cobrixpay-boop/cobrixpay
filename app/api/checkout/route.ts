@@ -21,7 +21,7 @@ export async function POST(req: Request) {
   try {
     const body = await req.json()
     const { amount, slug } = body
-    const merchant = getMerchantBySlug(slug)
+    const merchant = await getMerchantBySlug(slug)
     const merchantSlug = merchant?.slug || slug || 'cobrix'
 
     if (!amount || Number(amount) <= 0) {

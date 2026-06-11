@@ -1,5 +1,4 @@
-import fs from 'fs'
-import path from 'path'
+import { readMerchantStorage, writeMerchantStorage } from './storage'
 
 export type Merchant = {
   slug: string
@@ -42,30 +41,26 @@ function normalizeMerchantRecord(merchant: any, key: string): Merchant {
   }
 }
 
-let merchants: Record<string, Merchant> = { ...defaultMerchants }
-
-try {
-  const dataPath = path.join(process.cwd(), 'data', 'merchants.json')
-  if (fs.existsSync(dataPath)) {
-    const raw = fs.readFileSync(dataPath, 'utf-8')
-    const parsed = JSON.parse(raw)
-    const loaded: Record<string, Merchant> = Object.fromEntries(
-      Object.entries(parsed).map(([key, value]) => {
-        const merchant = normalizeMerchantRecord(value, key)
-        return [merchant.slug, merchant]
-      })
-    )
-    merchants = { ...merchants, ...loaded }
-  }
-} catch (e) {
-  console.warn('No se pudo cargar merchants.json:', e)
-}
-
-export function getMerchantBySlug(slug?: string) {
+export async function getMerchantBySlug(slug?: string) {
   if (!slug) return undefined
+  const merchants = await listMerchants()
   return merchants[normalizeSlug(slug)]
 }
 
-export function listMerchants() {
-  return merchants
+export async function listMerchants() {
+  const stored = await readMerchantStorage()
+  const loaded: Record<string, Merchant> = Object.fromEntries(
+    Object.entries(stored).map(([key, value]) => {
+      const merchant = normalizeMerchantRecord(value, key)
+      return [merchant.slug, merchant]
+    })
+  )
+
+  return { ...defaultMerchants, ...loaded }
+}
+
+export async function saveMerchant(merchant: Merchant) {
+  const merchants = await readMerchantStorage()
+  merchants[merchant.slug] = merchant
+  await writeMerchantStorage(merchants)
 }
