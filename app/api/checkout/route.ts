@@ -28,6 +28,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Monto inválido' }, { status: 400 })
     }
 
+    if (!merchant) {
+      return NextResponse.json({ error: `No existe el comercio "${slug}"` }, { status: 404 })
+    }
+
+    if (!merchant.stripeAccountId) {
+      return NextResponse.json({ error: `El comercio "${merchantSlug}" no tiene Stripe Account ID` }, { status: 400 })
+    }
+
     const baseUrl = getBaseUrl()
     const amountInCents = Math.round(Number(amount) * 100)
     const applicationFeePercent = merchant?.applicationFeePercent || 0
@@ -42,14 +50,12 @@ export async function POST(req: Request) {
       },
     }
 
-    if (merchant?.stripeAccountId) {
-      paymentIntentData.transfer_data = {
-        destination: merchant.stripeAccountId,
-      }
+    paymentIntentData.transfer_data = {
+      destination: merchant.stripeAccountId,
+    }
 
-      if (applicationFeeAmount > 0) {
-        paymentIntentData.application_fee_amount = applicationFeeAmount
-      }
+    if (applicationFeeAmount > 0) {
+      paymentIntentData.application_fee_amount = applicationFeeAmount
     }
 
     const stripe = getStripe()
@@ -79,7 +85,17 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ url: session.url })
   } catch (error: any) {
-    console.error('Error en checkout:', error.message)
-    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
+    console.error('Error en checkout:', {
+      message: error.message,
+      type: error.type,
+      code: error.code,
+      decline_code: error.decline_code,
+      param: error.param,
+    })
+
+    return NextResponse.json(
+      { error: error.message || 'No se pudo crear la sesion de pago' },
+      { status: error.statusCode || 500 }
+    )
   }
 }
