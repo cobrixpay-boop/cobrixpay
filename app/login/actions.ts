@@ -16,22 +16,29 @@ async function sendMagicLink(email: string, link: string) {
   })
 }
 
-type MerchantLoginState = {
+export type MerchantLoginState = {
+  status: 'idle' | 'success' | 'not_found'
   message: string
 }
 
-export async function requestMerchantLogin(_previousState: MerchantLoginState, formData: FormData) {
+export async function requestMerchantLogin(_previousState: MerchantLoginState, formData: FormData): Promise<MerchantLoginState> {
   const email = String(formData.get('email') || '').trim().toLowerCase()
   const merchant = await getMerchantByEmail(email)
 
-  if (merchant) {
-    const token = await createMerchantMagicLinkToken(merchant.slug, merchant.email)
-    const magicLink = `${getSiteUrl()}/login/verify?token=${encodeURIComponent(token)}`
-
-    await sendMagicLink(merchant.email, magicLink)
+  if (!merchant) {
+    return {
+      status: 'not_found',
+      message: 'No encontramos una cuenta asociada a ese correo.',
+    } satisfies MerchantLoginState
   }
+
+  const token = await createMerchantMagicLinkToken(merchant.slug, merchant.email)
+  const magicLink = `${getSiteUrl()}/login/verify?token=${encodeURIComponent(token)}`
+
+  await sendMagicLink(merchant.email, magicLink)
 
   return {
+    status: 'success',
     message: 'Te enviamos un enlace de acceso a tu correo',
-  }
+  } satisfies MerchantLoginState
 }

@@ -2,8 +2,10 @@
 
 import { useActionState } from 'react'
 import { requestMerchantLogin } from './actions'
+import type { MerchantLoginState } from './actions'
 
-const initialState = {
+const initialState: MerchantLoginState = {
+  status: 'idle',
   message: '',
 }
 
@@ -73,10 +75,36 @@ export default function MerchantLoginPage() {
           {pending ? 'Enviando...' : 'Enviar enlace'}
         </button>
 
-        {state.message && (
+        {state.status === 'success' && (
           <p role="status" style={{ margin: '14px 0 0', color: '#1b5e20' }}>
             {state.message}
           </p>
+        )}
+
+        {state.status === 'not_found' && (
+          <div role="alert" style={{ marginTop: 14 }}>
+            <p style={{ margin: 0, color: '#b00020', fontWeight: 700 }}>{state.message}</p>
+            <p style={{ margin: '8px 0 0', color: '#5b6275' }}>
+              Verific&aacute; que est&eacute; bien escrito o contactanos para ayudarte.
+            </p>
+            <a
+              href="https://wa.me/5491158809679"
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                display: 'inline-flex',
+                marginTop: 12,
+                padding: '10px 14px',
+                borderRadius: 8,
+                background: '#25d366',
+                color: '#102116',
+                textDecoration: 'none',
+                fontWeight: 700,
+              }}
+            >
+              Contactar por WhatsApp
+            </a>
+          </div>
         )}
       </form>
     </main>

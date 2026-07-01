@@ -14,10 +14,6 @@ function getPaymentLink(slug: string) {
   return `${getSiteUrl()}/pay/${slug}`
 }
 
-function shouldShowStripeOnboarding(status?: string, stripeAccountId?: string) {
-  return !stripeAccountId || status === 'pending' || status === 'incomplete'
-}
-
 function getStripeErrorMessage(error?: string) {
   if (error === 'missing_account') {
     return 'Tu comercio todavia no tiene una cuenta Stripe conectada.'
@@ -41,7 +37,7 @@ export default async function MerchantDashboardPage({ searchParams }: MerchantDa
   }
 
   const paymentLink = getPaymentLink(merchant.slug)
-  const status = merchant.status || 'pending'
+  const hasStripeAccount = Boolean(merchant.stripeAccountId)
 
   return (
     <main style={{ minHeight: '100vh', padding: '2rem 1rem', background: '#f5f7fb', color: '#171717' }}>
@@ -52,14 +48,16 @@ export default async function MerchantDashboardPage({ searchParams }: MerchantDa
 
           <dl style={{ display: 'grid', gap: 16, margin: '24px 0 0' }}>
             <div>
-              <dt style={{ color: '#5b6275', fontWeight: 700 }}>Estado</dt>
-              <dd style={{ margin: '6px 0 0' }}>{status}</dd>
-            </div>
-            <div>
               <dt style={{ color: '#5b6275', fontWeight: 700 }}>Link permanente</dt>
               <dd style={{ margin: '6px 0 0', overflowWrap: 'anywhere' }}>{paymentLink}</dd>
             </div>
           </dl>
+
+          {!hasStripeAccount && (
+            <p style={{ margin: '18px 0 0', color: '#7a4b00', fontWeight: 700 }}>
+              Completá la configuración de Stripe para poder recibir pagos.
+            </p>
+          )}
 
           <DashboardActions merchantName={merchant.name} paymentLink={paymentLink} />
 
@@ -70,12 +68,12 @@ export default async function MerchantDashboardPage({ searchParams }: MerchantDa
           )}
 
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 22 }}>
-            {merchant.stripeAccountId && (
+            {hasStripeAccount && (
               <a href="/api/stripe/express-login" style={primaryLinkStyle}>
                 Ver mi cuenta Stripe
               </a>
             )}
-            {shouldShowStripeOnboarding(status, merchant.stripeAccountId) && (
+            {!hasStripeAccount && (
               <a
                 href={process.env.NEXT_PUBLIC_STRIPE_ONBOARDING_URL || 'mailto:notificaciones@cobrixpay.com?subject=Completar alta Stripe'}
                 style={secondaryLinkStyle}
