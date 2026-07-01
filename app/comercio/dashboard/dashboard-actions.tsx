@@ -1,6 +1,7 @@
 'use client'
 
 import QRCode from 'qrcode'
+import { QRCodeCanvas } from 'qrcode.react'
 import { jsPDF } from 'jspdf'
 
 type DashboardActionsProps = {
@@ -55,19 +56,54 @@ export function DashboardActions({ merchantName, paymentLink }: DashboardActions
   }
 
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 18 }}>
-      <button type="button" onClick={copyPaymentLink} style={buttonStyle}>
-        Copiar link
-      </button>
-      <button type="button" onClick={downloadPng} style={buttonStyle}>
-        Descargar QR PNG
-      </button>
-      <button type="button" onClick={downloadPdf} style={buttonStyle}>
-        Descargar QR PDF
-      </button>
-    </div>
+    <section style={qrSectionStyle}>
+      <h2 style={{ margin: 0, fontSize: 24, lineHeight: 1.2 }}>Mi QR permanente</h2>
+
+      <div style={qrWrapperStyle}>
+        <QRCodeCanvas value={paymentLink} size={260} marginSize={2} level="H" />
+      </div>
+
+      <p style={paymentLinkStyle}>{paymentLink}</p>
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 10, marginTop: 18 }}>
+        <button type="button" onClick={copyPaymentLink} style={buttonStyle}>
+          Copiar link
+        </button>
+        <button type="button" onClick={downloadPng} style={buttonStyle}>
+          Descargar QR PNG
+        </button>
+        <button type="button" onClick={downloadPdf} style={buttonStyle}>
+          Descargar QR PDF
+        </button>
+      </div>
+    </section>
   )
 }
+
+const qrSectionStyle = {
+  marginTop: 24,
+  padding: 20,
+  border: '1px solid #e2e5ee',
+  borderRadius: 8,
+  background: '#fbfcff',
+  textAlign: 'center',
+} satisfies React.CSSProperties
+
+const qrWrapperStyle = {
+  display: 'inline-flex',
+  marginTop: 18,
+  padding: 14,
+  border: '1px solid #e2e5ee',
+  borderRadius: 8,
+  background: '#fff',
+} satisfies React.CSSProperties
+
+const paymentLinkStyle = {
+  margin: '16px auto 0',
+  maxWidth: 620,
+  color: '#3b4256',
+  overflowWrap: 'anywhere',
+} satisfies React.CSSProperties
 
 const buttonStyle = {
   padding: '10px 14px',

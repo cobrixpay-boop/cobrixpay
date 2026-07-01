@@ -46,13 +46,6 @@ export default async function MerchantDashboardPage({ searchParams }: MerchantDa
           <p style={{ margin: 0, color: '#5b6275', fontWeight: 700 }}>Cobrix Pay</p>
           <h1 style={{ margin: '8px 0 0', fontSize: 32, lineHeight: 1.2 }}>{merchant.name}</h1>
 
-          <dl style={{ display: 'grid', gap: 16, margin: '24px 0 0' }}>
-            <div>
-              <dt style={{ color: '#5b6275', fontWeight: 700 }}>Link permanente</dt>
-              <dd style={{ margin: '6px 0 0', overflowWrap: 'anywhere' }}>{paymentLink}</dd>
-            </div>
-          </dl>
-
           {!hasStripeAccount && (
             <p style={{ margin: '18px 0 0', color: '#7a4b00', fontWeight: 700 }}>
               Completá la configuración de Stripe para poder recibir pagos.
