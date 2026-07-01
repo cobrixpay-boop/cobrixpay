@@ -21,21 +21,26 @@ function getWebhookSecret() {
   return secret
 }
 
-function getBuyerEmail(paymentIntent: Stripe.PaymentIntent) {
+function getBuyerEmail(paymentIntent: Stripe.PaymentIntent, session?: Stripe.Checkout.Session) {
   const charge = (paymentIntent as any).charges?.data?.[0]
-  return paymentIntent.receipt_email || charge?.billing_details?.email
+  return paymentIntent.receipt_email || charge?.billing_details?.email || session?.customer_details?.email || session?.customer_email
 }
 
-async function getMerchantSlug(stripe: Stripe, paymentIntent: Stripe.PaymentIntent) {
-  const metadataSlug = paymentIntent.metadata?.merchantSlug
-  if (metadataSlug) return metadataSlug
-
+async function getCheckoutSession(stripe: Stripe, paymentIntent: Stripe.PaymentIntent) {
   const sessions = await stripe.checkout.sessions.list({
     payment_intent: paymentIntent.id,
     limit: 1,
   })
 
-  return sessions.data[0]?.metadata?.merchantSlug || sessions.data[0]?.client_reference_id || undefined
+  return sessions.data[0]
+}
+
+async function getMerchantSlug(stripe: Stripe, paymentIntent: Stripe.PaymentIntent, session?: Stripe.Checkout.Session) {
+  const metadataSlug = paymentIntent.metadata?.merchantSlug
+  if (metadataSlug) return metadataSlug
+
+  const checkoutSession = session || (await getCheckoutSession(stripe, paymentIntent))
+  return checkoutSession?.metadata?.merchantSlug || checkoutSession?.client_reference_id || undefined
 }
 
 async function sendEmail(to: string | string[], subject: string, text: string) {
@@ -72,7 +77,8 @@ export async function POST(req: Request) {
   }
 
   const paymentIntent = event.data.object as Stripe.PaymentIntent
-  const merchantSlug = await getMerchantSlug(stripe, paymentIntent)
+  const checkoutSession = await getCheckoutSession(stripe, paymentIntent)
+  const merchantSlug = await getMerchantSlug(stripe, paymentIntent, checkoutSession)
   const merchant = await getMerchantBySlug(merchantSlug)
   const merchantEmails =
     merchant?.notificationEmails && merchant.notificationEmails.length > 0
@@ -81,7 +87,7 @@ export async function POST(req: Request) {
       ? [merchant.email]
       : [process.env.DEFAULT_MERCHANT_EMAIL || 'cobrixpay@gmail.com']
   const merchantName = merchant?.name || merchantSlug?.replace(/-/g, ' ') || 'Cobrix Pay'
-  const buyerEmail = getBuyerEmail(paymentIntent)
+  const buyerEmail = getBuyerEmail(paymentIntent, checkoutSession)
   const amount = paymentIntent.amount / 100
 
   if (event.type === 'payment_intent.succeeded') {
