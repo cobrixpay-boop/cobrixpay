@@ -12,9 +12,11 @@ type DashboardActionsProps = {
 const COBRIX_BLUE = '#1455d9'
 const COBRIX_GREEN = '#11a36a'
 const SOFT_TEXT = '#64748b'
-const PAYMENT_LOGO_ASSETS = {
-  applePay: '/apple-pay-logo.png',
-  googlePay: '/google-pay-logo.png',
+const BRANDING_ASSETS = {
+  applePay: '/branding/apple-pay.svg',
+  cobrix: '/branding/cobrix-logo.png',
+  googlePay: '/branding/google-pay.svg',
+  stripe: '/branding/stripe.svg',
 }
 
 async function getQrDataUrl(paymentLink: string) {
@@ -41,50 +43,77 @@ function getFilename(merchantName: string, extension: string) {
   return `cobrix-pay-${safeName || 'comercio'}-qr.${extension}`
 }
 
-async function loadImageDataUrl(src: string) {
+async function loadBrandingImageDataUrl(src: string, width: number, height: number) {
   try {
     const response = await fetch(src)
     if (!response.ok) return null
 
     const blob = await response.blob()
+    const objectUrl = URL.createObjectURL(blob)
 
     return await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () => resolve(String(reader.result))
-      reader.onerror = reject
-      reader.readAsDataURL(blob)
+      const image = new Image()
+      image.onload = () => {
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        const context = canvas.getContext('2d')
+
+        if (!context) {
+          URL.revokeObjectURL(objectUrl)
+          reject(new Error('No se pudo preparar el logo para el PDF'))
+          return
+        }
+
+        context.clearRect(0, 0, width, height)
+        context.drawImage(image, 0, 0, width, height)
+        URL.revokeObjectURL(objectUrl)
+        resolve(canvas.toDataURL('image/png'))
+      }
+      image.onerror = () => {
+        URL.revokeObjectURL(objectUrl)
+        reject(new Error('No se pudo cargar el logo para el PDF'))
+      }
+      image.src = objectUrl
     })
   } catch {
     return null
   }
 }
 
-function drawPaymentFallbackLogos(pdf: jsPDF, centerX: number, y: number) {
-  pdf.setFont('helvetica', 'bold')
-  pdf.setFontSize(15)
-  pdf.setTextColor(23, 23, 23)
-  pdf.text('Apple Pay', centerX - 32, y, { align: 'center' })
-
-  pdf.setFontSize(15)
-  pdf.setTextColor(20, 85, 217)
-  pdf.text('Google', centerX + 19, y, { align: 'right' })
-  pdf.setTextColor(23, 23, 23)
-  pdf.text(' Pay', centerX + 20, y, { align: 'left' })
-}
-
 async function drawPaymentLogos(pdf: jsPDF, centerX: number, y: number) {
   const [applePayLogo, googlePayLogo] = await Promise.all([
-    loadImageDataUrl(PAYMENT_LOGO_ASSETS.applePay),
-    loadImageDataUrl(PAYMENT_LOGO_ASSETS.googlePay),
+    loadBrandingImageDataUrl(BRANDING_ASSETS.applePay, 420, 160),
+    loadBrandingImageDataUrl(BRANDING_ASSETS.googlePay, 520, 160),
   ])
 
   if (applePayLogo && googlePayLogo) {
-    pdf.addImage(applePayLogo, 'PNG', centerX - 56, y - 9, 42, 14)
-    pdf.addImage(googlePayLogo, 'PNG', centerX + 14, y - 9, 42, 14)
-    return
+    pdf.addImage(applePayLogo, 'PNG', centerX - 58, y - 9, 42, 16)
+    pdf.addImage(googlePayLogo, 'PNG', centerX + 14, y - 9, 52, 16)
+  }
+}
+
+async function drawFooterBranding(pdf: jsPDF, centerX: number, pageHeight: number) {
+  const [stripeLogo, cobrixLogo] = await Promise.all([
+    loadBrandingImageDataUrl(BRANDING_ASSETS.stripe, 360, 120),
+    loadBrandingImageDataUrl(BRANDING_ASSETS.cobrix, 480, 180),
+  ])
+
+  pdf.setFont('helvetica', 'normal')
+  pdf.setFontSize(9)
+  pdf.setTextColor(SOFT_TEXT)
+  pdf.text('Secure payment processing', centerX, pageHeight - 47, { align: 'center' })
+  pdf.text('Powered by', centerX, pageHeight - 39, { align: 'center' })
+
+  if (stripeLogo) {
+    pdf.addImage(stripeLogo, 'PNG', centerX - 13, pageHeight - 35, 26, 8)
   }
 
-  drawPaymentFallbackLogos(pdf, centerX, y)
+  pdf.text('via', centerX, pageHeight - 19, { align: 'center' })
+
+  if (cobrixLogo) {
+    pdf.addImage(cobrixLogo, 'PNG', centerX - 18, pageHeight - 16, 36, 12)
+  }
 }
 
 export function DashboardActions({ merchantName, paymentLink }: DashboardActionsProps) {
@@ -129,12 +158,7 @@ export function DashboardActions({ merchantName, paymentLink }: DashboardActions
     pdf.setTextColor(SOFT_TEXT)
     pdf.text('International Cards Accepted', centerX, qrY + qrSize + 37, { align: 'center' })
 
-    pdf.setFontSize(9)
-    pdf.text('Secure payment processing', centerX, pageHeight - 34, { align: 'center' })
-    pdf.text('Powered by Stripe', centerX, pageHeight - 27, { align: 'center' })
-    pdf.setFont('helvetica', 'bold')
-    pdf.setTextColor(COBRIX_BLUE)
-    pdf.text('Cobrix Pay', centerX, pageHeight - 20, { align: 'center' })
+    await drawFooterBranding(pdf, centerX, pageHeight)
 
     pdf.save(getFilename(merchantName, 'pdf'))
   }
