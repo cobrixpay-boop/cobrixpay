@@ -17,6 +17,18 @@ type MonthlySummary = {
   averageTicket: number
 }
 
+type MonthlyPayment = {
+  id: string
+  created: number
+  amount: number
+  status: string
+}
+
+type MonthlyDashboardData = {
+  summary: MonthlySummary
+  payments: MonthlyPayment[]
+}
+
 function getPaymentLink(slug: string) {
   return `${getSiteUrl()}/pay/${slug}`
 }
@@ -41,16 +53,31 @@ function getCurrentMonthRange() {
   }
 }
 
-async function getMonthlySummary(merchantSlug: string, stripeAccountId?: string): Promise<MonthlySummary> {
+function getPaymentStatus(paymentIntent: Stripe.PaymentIntent) {
+  const latestCharge =
+    typeof paymentIntent.latest_charge === 'object' && paymentIntent.latest_charge ? paymentIntent.latest_charge : null
+
+  if (latestCharge?.refunded || (latestCharge?.amount_refunded || 0) > 0) {
+    return 'refunded'
+  }
+
+  return paymentIntent.status
+}
+
+async function getMonthlyDashboardData(merchantSlug: string, stripeAccountId?: string): Promise<MonthlyDashboardData> {
   const stripe = getStripe()
 
   if (!stripe || !stripeAccountId) {
-    return { totalProcessed: 0, paymentCount: 0, averageTicket: 0 }
+    return {
+      summary: { totalProcessed: 0, paymentCount: 0, averageTicket: 0 },
+      payments: [],
+    }
   }
 
   const { startTimestamp, endTimestamp } = getCurrentMonthRange()
   let totalProcessed = 0
   let paymentCount = 0
+  const payments: MonthlyPayment[] = []
 
   try {
     const paymentIntents = stripe.paymentIntents.list({
@@ -58,6 +85,7 @@ async function getMonthlySummary(merchantSlug: string, stripeAccountId?: string)
         gte: startTimestamp,
         lte: endTimestamp,
       },
+      expand: ['data.latest_charge'],
       limit: 100,
     })
 
@@ -70,15 +98,30 @@ async function getMonthlySummary(merchantSlug: string, stripeAccountId?: string)
         totalProcessed += paymentIntent.amount_received || paymentIntent.amount
         paymentCount += 1
       }
+
+      if (belongsToMerchant && payments.length < 20) {
+        payments.push({
+          id: paymentIntent.id,
+          created: paymentIntent.created,
+          amount: paymentIntent.amount_received || paymentIntent.amount,
+          status: getPaymentStatus(paymentIntent),
+        })
+      }
     }
   } catch {
-    return { totalProcessed: 0, paymentCount: 0, averageTicket: 0 }
+    return {
+      summary: { totalProcessed: 0, paymentCount: 0, averageTicket: 0 },
+      payments: [],
+    }
   }
 
   return {
-    totalProcessed,
-    paymentCount,
-    averageTicket: paymentCount > 0 ? Math.round(totalProcessed / paymentCount) : 0,
+    summary: {
+      totalProcessed,
+      paymentCount,
+      averageTicket: paymentCount > 0 ? Math.round(totalProcessed / paymentCount) : 0,
+    },
+    payments,
   }
 }
 
@@ -87,6 +130,32 @@ function formatCurrency(cents: number) {
     style: 'currency',
     currency: 'USD',
   }).format(cents / 100)
+}
+
+function formatPaymentDate(timestamp: number) {
+  return new Intl.DateTimeFormat('es-AR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(new Date(timestamp * 1000))
+}
+
+function formatPaymentTime(timestamp: number) {
+  return new Intl.DateTimeFormat('es-AR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(timestamp * 1000))
+}
+
+function translatePaymentStatus(status: string) {
+  if (status === 'succeeded') return 'Pagado'
+  if (status === 'pending' || status === 'processing' || status === 'requires_confirmation' || status === 'requires_action') {
+    return 'Pendiente'
+  }
+  if (status === 'requires_payment_method' || status === 'canceled') return 'Fallido'
+  if (status === 'refunded') return 'Reembolsado'
+
+  return 'Pendiente'
 }
 
 function getStripeErrorMessage(error?: string) {
@@ -113,7 +182,8 @@ export default async function MerchantDashboardPage({ searchParams }: MerchantDa
 
   const paymentLink = getPaymentLink(merchant.slug)
   const hasStripeAccount = Boolean(merchant.stripeAccountId)
-  const monthlySummary = await getMonthlySummary(merchant.slug, merchant.stripeAccountId)
+  const monthlyData = await getMonthlyDashboardData(merchant.slug, merchant.stripeAccountId)
+  const monthlySummary = monthlyData.summary
 
   return (
     <main style={{ minHeight: '100vh', padding: '2rem 1rem', background: '#f5f7fb', color: '#171717' }}>
@@ -142,6 +212,41 @@ export default async function MerchantDashboardPage({ searchParams }: MerchantDa
                 <strong style={summaryValueStyle}>{formatCurrency(monthlySummary.averageTicket)}</strong>
               </div>
             </div>
+          </section>
+
+          <section style={paymentsSectionStyle}>
+            <h2 style={{ margin: 0, fontSize: 24, lineHeight: 1.2 }}>Cobros del mes</h2>
+
+            {monthlyData.payments.length > 0 ? (
+              <div style={{ marginTop: 16, overflowX: 'auto' }}>
+                <table style={paymentsTableStyle}>
+                  <thead>
+                    <tr>
+                      <th style={paymentsHeaderCellStyle}>Fecha</th>
+                      <th style={paymentsHeaderCellStyle}>Hora</th>
+                      <th style={paymentsHeaderCellStyle}>Monto</th>
+                      <th style={paymentsHeaderCellStyle}>Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {monthlyData.payments.map((payment) => (
+                      <tr key={payment.id}>
+                        <td style={paymentsCellStyle}>{formatPaymentDate(payment.created)}</td>
+                        <td style={paymentsCellStyle}>{formatPaymentTime(payment.created)}</td>
+                        <td style={paymentsCellStyle}>{formatCurrency(payment.amount)}</td>
+                        <td style={paymentsCellStyle}>{translatePaymentStatus(payment.status)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p style={{ margin: '14px 0 0', color: '#5b6275' }}>
+                Todav&iacute;a no registr&aacute;s cobros este mes.
+                <br />
+                Cuando recibas tu primer pago aparecer&aacute; aqu&iacute;.
+              </p>
+            )}
           </section>
 
           {!hasStripeAccount && (
@@ -212,6 +317,34 @@ const summaryValueStyle = {
   marginTop: 8,
   fontSize: 24,
   lineHeight: 1.2,
+} satisfies React.CSSProperties
+
+const paymentsSectionStyle = {
+  marginTop: 18,
+  padding: 20,
+  border: '1px solid #e2e5ee',
+  borderRadius: 8,
+  background: '#fff',
+} satisfies React.CSSProperties
+
+const paymentsTableStyle = {
+  width: '100%',
+  borderCollapse: 'collapse',
+  minWidth: 520,
+} satisfies React.CSSProperties
+
+const paymentsHeaderCellStyle = {
+  padding: '10px 8px',
+  borderBottom: '1px solid #e2e5ee',
+  color: '#5b6275',
+  fontSize: 14,
+  textAlign: 'left',
+} satisfies React.CSSProperties
+
+const paymentsCellStyle = {
+  padding: '12px 8px',
+  borderBottom: '1px solid #eef1f7',
+  textAlign: 'left',
 } satisfies React.CSSProperties
 
 const primaryLinkStyle = {
