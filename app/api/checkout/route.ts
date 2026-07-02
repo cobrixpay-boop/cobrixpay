@@ -39,15 +39,18 @@ export async function POST(req: Request) {
     const baseUrl = getBaseUrl()
     const amountInCents = Math.round(Number(amount) * 100)
     const applicationFeePercent = merchant?.applicationFeePercent || 0
+    const merchantName = merchant.name || merchantSlug
+    const paymentMetadata = {
+      merchantSlug,
+      merchantName,
+      applicationFeePercent: String(applicationFeePercent),
+    }
     const applicationFeeAmount = Math.min(
       amountInCents,
       Math.max(0, Math.round((amountInCents * applicationFeePercent) / 100))
     )
-    const paymentIntentData: any = {
-      metadata: {
-        merchantSlug,
-        applicationFeePercent: String(applicationFeePercent),
-      },
+    const paymentIntentData: Stripe.Checkout.SessionCreateParams.PaymentIntentData = {
+      metadata: paymentMetadata,
     }
 
     paymentIntentData.transfer_data = {
@@ -63,15 +66,13 @@ export async function POST(req: Request) {
       mode: 'payment',
       payment_method_types: ['card'],
       client_reference_id: merchantSlug,
-      metadata: {
-        merchantSlug,
-      },
+      metadata: paymentMetadata,
       line_items: [
         {
           price_data: {
             currency: 'usd',
             product_data: {
-              name: `Pago a ${merchant?.name || slug || 'Cobrix Pay'}`,
+              name: `Pago a ${merchantName}`,
             },
             unit_amount: amountInCents,
           },
@@ -80,22 +81,31 @@ export async function POST(req: Request) {
       ],
       payment_intent_data: paymentIntentData,
       success_url: `${baseUrl}/success`,
-      cancel_url: `${baseUrl}/cancel`,
+      cancel_url: `${baseUrl}/cancel?merchant=${encodeURIComponent(merchantSlug)}`,
     })
 
     return NextResponse.json({ url: session.url })
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const stripeError = error as {
+      message?: string
+      type?: string
+      code?: string
+      decline_code?: string
+      param?: string
+      statusCode?: number
+    }
+
     console.error('Error en checkout:', {
-      message: error.message,
-      type: error.type,
-      code: error.code,
-      decline_code: error.decline_code,
-      param: error.param,
+      message: stripeError.message,
+      type: stripeError.type,
+      code: stripeError.code,
+      decline_code: stripeError.decline_code,
+      param: stripeError.param,
     })
 
     return NextResponse.json(
-      { error: error.message || 'No se pudo crear la sesion de pago' },
-      { status: error.statusCode || 500 }
+      { error: stripeError.message || 'No se pudo crear la sesion de pago' },
+      { status: stripeError.statusCode || 500 }
     )
   }
 }

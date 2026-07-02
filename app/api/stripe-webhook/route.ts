@@ -3,6 +3,16 @@ import Stripe from 'stripe'
 import { Resend } from 'resend'
 import { getMerchantBySlug } from '../../../lib/merchants'
 
+type PaymentIntentWithCharges = Stripe.PaymentIntent & {
+  charges?: {
+    data?: Array<{
+      billing_details?: {
+        email?: string | null
+      }
+    }>
+  }
+}
+
 function getStripe() {
   return new Stripe(process.env.STRIPE_SECRET_KEY!, {
     apiVersion: '2026-02-25.clover',
@@ -22,7 +32,7 @@ function getWebhookSecret() {
 }
 
 function getBuyerEmail(paymentIntent: Stripe.PaymentIntent, session?: Stripe.Checkout.Session) {
-  const charge = (paymentIntent as any).charges?.data?.[0]
+  const charge = (paymentIntent as PaymentIntentWithCharges).charges?.data?.[0]
   return paymentIntent.receipt_email || charge?.billing_details?.email || session?.customer_details?.email || session?.customer_email
 }
 
@@ -41,6 +51,22 @@ async function getMerchantSlug(stripe: Stripe, paymentIntent: Stripe.PaymentInte
 
   const checkoutSession = session || (await getCheckoutSession(stripe, paymentIntent))
   return checkoutSession?.metadata?.merchantSlug || checkoutSession?.client_reference_id || undefined
+}
+
+function getMerchantName(paymentIntent: Stripe.PaymentIntent, session?: Stripe.Checkout.Session) {
+  return paymentIntent.metadata?.merchantName || session?.metadata?.merchantName
+}
+
+function formatAmount(amountInCents: number) {
+  return (amountInCents / 100).toFixed(2)
+}
+
+function formatPaymentDate(timestamp: number) {
+  return new Intl.DateTimeFormat('es-AR', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+    timeZone: 'America/Argentina/Buenos_Aires',
+  }).format(new Date(timestamp * 1000))
 }
 
 async function sendEmail(to: string | string[], subject: string, text: string) {
@@ -72,7 +98,7 @@ export async function POST(req: Request) {
     const body = await req.text()
     const webhookSecret = getWebhookSecret()
     event = stripe.webhooks.constructEvent(body, sig, webhookSecret)
-  } catch (err) {
+  } catch {
     return NextResponse.json({ error: 'Webhook Error' }, { status: 400 })
   }
 
@@ -86,32 +112,42 @@ export async function POST(req: Request) {
       : merchant?.email
       ? [merchant.email]
       : [process.env.DEFAULT_MERCHANT_EMAIL || 'cobrixpay@gmail.com']
-  const merchantName = merchant?.name || merchantSlug?.replace(/-/g, ' ') || 'Cobrix Pay'
+  const merchantName = merchant?.name || getMerchantName(paymentIntent, checkoutSession) || merchantSlug?.replace(/-/g, ' ') || 'Cobrix Pay'
   const buyerEmail = getBuyerEmail(paymentIntent, checkoutSession)
-  const amount = paymentIntent.amount / 100
+  const amount = formatAmount(paymentIntent.amount)
+  const paymentDate = formatPaymentDate(paymentIntent.created)
 
   if (event.type === 'payment_intent.succeeded') {
     const merchantPromise = sendEmail(
       merchantEmails,
-      `Pago recibido ✅ - ${amount} USD`,
-      `¡Hola ${merchantName}!
-Se recibió un pago de USD ${amount}.
-ID: ${paymentIntent.id}
-Gracias por usar Cobrix Pay!
-Saludos,
-Martín`
+      `Nuevo cobro recibido - USD ${amount}`,
+      `Nuevo cobro recibido
+
+Comercio: ${merchantName}
+Monto: USD ${amount}
+Fecha y hora: ${paymentDate}
+ID de operación Stripe: ${paymentIntent.id}
+
+Este cobro ya fue procesado correctamente.
+
+Cobrix Pay`
     )
 
     const buyerPromise = buyerEmail
       ? sendEmail(
           buyerEmail,
-          `Pago confirmado ✅ - ${amount} USD`,
-          `¡Hola!
-Tu pago de USD ${amount} fue procesado correctamente.
-ID: ${paymentIntent.id}
-Gracias por tu compra.
-Saludos,
-Martín`
+          `Pago confirmado en ${merchantName}`,
+          `Pago confirmado
+
+Tu pago a ${merchantName} fue procesado correctamente.
+
+Monto: USD ${amount}
+Fecha y hora: ${paymentDate}
+ID de operación Stripe: ${paymentIntent.id}
+
+Pago procesado de forma segura por Cobrix Pay.
+
+Cobrix Pay`
         )
       : Promise.resolve()
 
@@ -119,32 +155,43 @@ Martín`
   }
 
   if (event.type === 'payment_intent.payment_failed') {
-    const reason = paymentIntent.last_payment_error?.message || 'Motivo desconocido'
+    const reason = paymentIntent.last_payment_error?.message || 'No pudimos procesar el pago.'
 
-    const failedMessage = `Hola ${merchantName}.
-Un pago de USD ${amount} fue rechazado.
+    const failedMessage = `Pago no procesado
+
+Comercio: ${merchantName}
+Monto: USD ${amount}
+Fecha y hora: ${paymentDate}
+ID de operación Stripe: ${paymentIntent.id}
+
+El pago no pudo completarse.
 Motivo: ${reason}
-ID: ${paymentIntent.id}
-Saludos,
-Martín`
+
+Cobrix Pay`
 
     const merchantPromise = sendEmail(
       merchantEmails,
-      `Pago rechazado ❌ - ${amount} USD`,
+      `Pago no procesado - USD ${amount}`,
       failedMessage
     )
 
     const buyerPromise = buyerEmail
       ? sendEmail(
           buyerEmail,
-          `Pago rechazado ❌ - ${amount} USD`,
-          `Hola.
-Tu pago de USD ${amount} fue rechazado.
+          `No pudimos procesar tu pago en ${merchantName}`,
+          `Pago no procesado
+
+No pudimos procesar tu pago a ${merchantName}.
+
+Monto: USD ${amount}
+Fecha y hora: ${paymentDate}
+ID de operación Stripe: ${paymentIntent.id}
+
 Motivo: ${reason}
-ID: ${paymentIntent.id}
-Por favor intenta nuevamente o consulta a soporte.
-Saludos,
-Martín`
+
+Por favor intentá nuevamente o consultá al comercio si necesitás ayuda.
+
+Cobrix Pay`
         )
       : Promise.resolve()
 
