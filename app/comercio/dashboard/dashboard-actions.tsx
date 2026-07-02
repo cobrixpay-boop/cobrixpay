@@ -43,7 +43,39 @@ function getFilename(merchantName: string, extension: string) {
   return `cobrix-pay-${safeName || 'comercio'}-qr.${extension}`
 }
 
-async function loadBrandingImageDataUrl(src: string, width: number, height: number) {
+function getVisibleImageBounds(context: CanvasRenderingContext2D, width: number, height: number) {
+  const imageData = context.getImageData(0, 0, width, height).data
+  let minX = width
+  let minY = height
+  let maxX = 0
+  let maxY = 0
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const alpha = imageData[(y * width + x) * 4 + 3]
+
+      if (alpha > 0) {
+        minX = Math.min(minX, x)
+        minY = Math.min(minY, y)
+        maxX = Math.max(maxX, x)
+        maxY = Math.max(maxY, y)
+      }
+    }
+  }
+
+  if (minX > maxX || minY > maxY) {
+    return { x: 0, y: 0, width, height }
+  }
+
+  return {
+    x: minX,
+    y: minY,
+    width: maxX - minX + 1,
+    height: maxY - minY + 1,
+  }
+}
+
+async function loadBrandingImageDataUrl(src: string, width: number, height: number, visualScale = 1) {
   try {
     const response = await fetch(src)
     if (!response.ok) return null
@@ -54,25 +86,35 @@ async function loadBrandingImageDataUrl(src: string, width: number, height: numb
     return await new Promise<string>((resolve, reject) => {
       const image = new Image()
       image.onload = () => {
+        const sourceCanvas = document.createElement('canvas')
+        sourceCanvas.width = image.naturalWidth
+        sourceCanvas.height = image.naturalHeight
+        const sourceContext = sourceCanvas.getContext('2d')
         const canvas = document.createElement('canvas')
         canvas.width = width
         canvas.height = height
         const context = canvas.getContext('2d')
 
-        if (!context) {
+        if (!context || !sourceContext) {
           URL.revokeObjectURL(objectUrl)
           reject(new Error('No se pudo preparar el logo para el PDF'))
           return
         }
 
-        const scale = Math.min(width / image.naturalWidth, height / image.naturalHeight)
-        const drawWidth = image.naturalWidth * scale
-        const drawHeight = image.naturalHeight * scale
+        sourceContext.clearRect(0, 0, image.naturalWidth, image.naturalHeight)
+        sourceContext.drawImage(image, 0, 0)
+
+        const bounds = getVisibleImageBounds(sourceContext, image.naturalWidth, image.naturalHeight)
+        const containScale = Math.min((width * 0.82) / bounds.width, (height * 0.82) / bounds.height)
+        const maxScale = Math.min(width / bounds.width, height / bounds.height)
+        const scale = Math.min(containScale * visualScale, maxScale)
+        const drawWidth = bounds.width * scale
+        const drawHeight = bounds.height * scale
         const drawX = (width - drawWidth) / 2
         const drawY = (height - drawHeight) / 2
 
         context.clearRect(0, 0, width, height)
-        context.drawImage(image, drawX, drawY, drawWidth, drawHeight)
+        context.drawImage(sourceCanvas, bounds.x, bounds.y, bounds.width, bounds.height, drawX, drawY, drawWidth, drawHeight)
         URL.revokeObjectURL(objectUrl)
         resolve(canvas.toDataURL('image/png'))
       }
@@ -89,12 +131,12 @@ async function loadBrandingImageDataUrl(src: string, width: number, height: numb
 
 async function drawPaymentLogos(pdf: jsPDF, centerX: number, y: number) {
   const [applePayLogo, googlePayLogo] = await Promise.all([
-    loadBrandingImageDataUrl(BRANDING_ASSETS.applePay, 640, 220),
-    loadBrandingImageDataUrl(BRANDING_ASSETS.googlePay, 640, 220),
+    loadBrandingImageDataUrl(BRANDING_ASSETS.applePay, 640, 220, 1),
+    loadBrandingImageDataUrl(BRANDING_ASSETS.googlePay, 640, 220, 1.3),
   ])
-  const logoWidth = 42
-  const logoHeight = 14
-  const logoGap = 12
+  const logoWidth = 44
+  const logoHeight = 15
+  const logoGap = 9
 
   if (applePayLogo && googlePayLogo) {
     pdf.addImage(applePayLogo, 'PNG', centerX - logoWidth - logoGap / 2, y - logoHeight / 2, logoWidth, logoHeight)
@@ -158,12 +200,12 @@ export function DashboardActions({ merchantName, paymentLink }: DashboardActions
 
     pdf.addImage(dataUrl, 'PNG', qrX, qrY, qrSize, qrSize)
 
-    await drawPaymentLogos(pdf, centerX, qrY + qrSize + 23)
+    await drawPaymentLogos(pdf, centerX, qrY + qrSize + 18)
 
     pdf.setFont('helvetica', 'normal')
     pdf.setFontSize(11)
     pdf.setTextColor(SOFT_TEXT)
-    pdf.text('International Cards Accepted', centerX, qrY + qrSize + 37, { align: 'center' })
+    pdf.text('International Cards Accepted', centerX, qrY + qrSize + 32, { align: 'center' })
 
     await drawFooterBranding(pdf, centerX, pageHeight)
 
