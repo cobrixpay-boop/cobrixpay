@@ -1,3 +1,4 @@
+import Stripe from 'stripe'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { DashboardActions } from './dashboard-actions'
@@ -10,8 +11,82 @@ type MerchantDashboardPageProps = {
   }>
 }
 
+type MonthlySummary = {
+  totalProcessed: number
+  paymentCount: number
+  averageTicket: number
+}
+
 function getPaymentLink(slug: string) {
   return `${getSiteUrl()}/pay/${slug}`
+}
+
+function getStripe() {
+  const secretKey = process.env.STRIPE_SECRET_KEY
+
+  if (!secretKey) return null
+
+  return new Stripe(secretKey, {
+    apiVersion: '2026-02-25.clover',
+  })
+}
+
+function getCurrentMonthRange() {
+  const now = new Date()
+  const start = new Date(now.getFullYear(), now.getMonth(), 1)
+
+  return {
+    startTimestamp: Math.floor(start.getTime() / 1000),
+    endTimestamp: Math.floor(now.getTime() / 1000),
+  }
+}
+
+async function getMonthlySummary(merchantSlug: string, stripeAccountId?: string): Promise<MonthlySummary> {
+  const stripe = getStripe()
+
+  if (!stripe || !stripeAccountId) {
+    return { totalProcessed: 0, paymentCount: 0, averageTicket: 0 }
+  }
+
+  const { startTimestamp, endTimestamp } = getCurrentMonthRange()
+  let totalProcessed = 0
+  let paymentCount = 0
+
+  try {
+    const paymentIntents = stripe.paymentIntents.list({
+      created: {
+        gte: startTimestamp,
+        lte: endTimestamp,
+      },
+      limit: 100,
+    })
+
+    for await (const paymentIntent of paymentIntents) {
+      const belongsToMerchant =
+        paymentIntent.metadata?.merchantSlug === merchantSlug &&
+        paymentIntent.transfer_data?.destination === stripeAccountId
+
+      if (paymentIntent.status === 'succeeded' && belongsToMerchant) {
+        totalProcessed += paymentIntent.amount_received || paymentIntent.amount
+        paymentCount += 1
+      }
+    }
+  } catch {
+    return { totalProcessed: 0, paymentCount: 0, averageTicket: 0 }
+  }
+
+  return {
+    totalProcessed,
+    paymentCount,
+    averageTicket: paymentCount > 0 ? Math.round(totalProcessed / paymentCount) : 0,
+  }
+}
+
+function formatCurrency(cents: number) {
+  return new Intl.NumberFormat('es-AR', {
+    style: 'currency',
+    currency: 'USD',
+  }).format(cents / 100)
 }
 
 function getStripeErrorMessage(error?: string) {
@@ -38,6 +113,7 @@ export default async function MerchantDashboardPage({ searchParams }: MerchantDa
 
   const paymentLink = getPaymentLink(merchant.slug)
   const hasStripeAccount = Boolean(merchant.stripeAccountId)
+  const monthlySummary = await getMonthlySummary(merchant.slug, merchant.stripeAccountId)
 
   return (
     <main style={{ minHeight: '100vh', padding: '2rem 1rem', background: '#f5f7fb', color: '#171717' }}>
@@ -45,6 +121,28 @@ export default async function MerchantDashboardPage({ searchParams }: MerchantDa
         <div style={{ padding: 24, border: '1px solid #e2e5ee', borderRadius: 8, background: '#fff' }}>
           <p style={{ margin: 0, color: '#5b6275', fontWeight: 700 }}>Cobrix Pay</p>
           <h1 style={{ margin: '8px 0 0', fontSize: 32, lineHeight: 1.2 }}>{merchant.name}</h1>
+
+          <section style={summarySectionStyle}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: 24, lineHeight: 1.2 }}>Resumen mensual</h2>
+              <p style={{ margin: '6px 0 0', color: '#5b6275' }}>Desde el 1 del mes actual hasta hoy</p>
+            </div>
+
+            <div style={summaryGridStyle}>
+              <div style={summaryCardStyle}>
+                <p style={summaryLabelStyle}>Total procesado</p>
+                <strong style={summaryValueStyle}>{formatCurrency(monthlySummary.totalProcessed)}</strong>
+              </div>
+              <div style={summaryCardStyle}>
+                <p style={summaryLabelStyle}>Cantidad de cobros</p>
+                <strong style={summaryValueStyle}>{monthlySummary.paymentCount}</strong>
+              </div>
+              <div style={summaryCardStyle}>
+                <p style={summaryLabelStyle}>Ticket promedio</p>
+                <strong style={summaryValueStyle}>{formatCurrency(monthlySummary.averageTicket)}</strong>
+              </div>
+            </div>
+          </section>
 
           {!hasStripeAccount && (
             <p style={{ margin: '18px 0 0', color: '#7a4b00', fontWeight: 700 }}>
@@ -80,6 +178,41 @@ export default async function MerchantDashboardPage({ searchParams }: MerchantDa
     </main>
   )
 }
+
+const summarySectionStyle = {
+  marginTop: 24,
+  padding: 20,
+  border: '1px solid #e2e5ee',
+  borderRadius: 8,
+  background: '#fbfcff',
+} satisfies React.CSSProperties
+
+const summaryGridStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+  gap: 12,
+  marginTop: 16,
+} satisfies React.CSSProperties
+
+const summaryCardStyle = {
+  padding: 16,
+  border: '1px solid #e2e5ee',
+  borderRadius: 8,
+  background: '#fff',
+} satisfies React.CSSProperties
+
+const summaryLabelStyle = {
+  margin: 0,
+  color: '#5b6275',
+  fontWeight: 700,
+} satisfies React.CSSProperties
+
+const summaryValueStyle = {
+  display: 'block',
+  marginTop: 8,
+  fontSize: 24,
+  lineHeight: 1.2,
+} satisfies React.CSSProperties
 
 const primaryLinkStyle = {
   display: 'inline-flex',
