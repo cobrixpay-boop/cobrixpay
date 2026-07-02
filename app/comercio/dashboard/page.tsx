@@ -186,11 +186,10 @@ export default async function MerchantDashboardPage({ searchParams }: MerchantDa
   const monthlySummary = monthlyData.summary
 
   return (
-    <main style={{ minHeight: '100vh', padding: '2rem 1rem', background: '#f5f7fb', color: '#171717' }}>
-      <section style={{ width: '100%', maxWidth: 820, margin: '0 auto' }}>
-        <div style={{ padding: 24, border: '1px solid #e2e5ee', borderRadius: 8, background: '#fff' }}>
-          <p style={{ margin: 0, color: '#5b6275', fontWeight: 700 }}>Cobrix Pay</p>
-          <h1 style={{ margin: '8px 0 0', fontSize: 32, lineHeight: 1.2 }}>{merchant.name}</h1>
+    <main style={{ minHeight: '100vh', padding: '32px 16px', background: '#f5f7fb', color: '#171717' }}>
+      <section style={{ width: '100%', maxWidth: 960, margin: '0 auto' }}>
+        <div style={dashboardCardStyle}>
+          <h1 style={{ margin: 0, fontSize: 32, lineHeight: 1.2 }}>{merchant.name}</h1>
 
           <section style={summarySectionStyle}>
             <div>
@@ -263,7 +262,7 @@ export default async function MerchantDashboardPage({ searchParams }: MerchantDa
             </p>
           )}
 
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 22 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 24 }}>
             {hasStripeAccount && (
               <a href="/api/stripe/express-login" style={primaryLinkStyle}>
                 Ver mi cuenta Stripe
@@ -283,6 +282,14 @@ export default async function MerchantDashboardPage({ searchParams }: MerchantDa
     </main>
   )
 }
+
+const dashboardCardStyle = {
+  padding: 28,
+  border: '1px solid #e2e5ee',
+  borderRadius: 8,
+  background: '#fff',
+  boxShadow: '0 10px 30px rgba(23, 23, 23, 0.05)',
+} satisfies React.CSSProperties
 
 const summarySectionStyle = {
   marginTop: 24,

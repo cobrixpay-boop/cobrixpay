@@ -63,17 +63,20 @@ export function DashboardActions({ merchantName, paymentLink }: DashboardActions
         <QRCodeCanvas value={paymentLink} size={260} marginSize={2} level="H" />
       </div>
 
-      <p style={paymentLinkStyle}>{paymentLink}</p>
+      <div style={paymentLinkBlockStyle}>
+        <p style={paymentLinkLabelStyle}>Enlace permanente</p>
+        <p style={paymentLinkStyle}>{paymentLink}</p>
+      </div>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 10, marginTop: 18 }}>
-        <button type="button" onClick={copyPaymentLink} style={buttonStyle}>
+        <button type="button" onClick={downloadPdf} style={primaryButtonStyle}>
+          Descargar QR PDF
+        </button>
+        <button type="button" onClick={copyPaymentLink} style={secondaryButtonStyle}>
           Copiar link
         </button>
-        <button type="button" onClick={downloadPng} style={buttonStyle}>
+        <button type="button" onClick={downloadPng} style={secondaryButtonStyle}>
           Descargar QR PNG
-        </button>
-        <button type="button" onClick={downloadPdf} style={buttonStyle}>
-          Descargar QR PDF
         </button>
       </div>
     </section>
@@ -82,7 +85,7 @@ export function DashboardActions({ merchantName, paymentLink }: DashboardActions
 
 const qrSectionStyle = {
   marginTop: 24,
-  padding: 20,
+  padding: 24,
   border: '1px solid #e2e5ee',
   borderRadius: 8,
   background: '#fbfcff',
@@ -98,14 +101,37 @@ const qrWrapperStyle = {
   background: '#fff',
 } satisfies React.CSSProperties
 
-const paymentLinkStyle = {
+const paymentLinkBlockStyle = {
   margin: '16px auto 0',
   maxWidth: 620,
-  color: '#3b4256',
+} satisfies React.CSSProperties
+
+const paymentLinkLabelStyle = {
+  margin: 0,
+  color: '#5b6275',
+  fontSize: 13,
+  fontWeight: 700,
+} satisfies React.CSSProperties
+
+const paymentLinkStyle = {
+  margin: '6px 0 0',
+  color: '#6b7280',
+  fontSize: 13,
+  lineHeight: 1.5,
   overflowWrap: 'anywhere',
 } satisfies React.CSSProperties
 
-const buttonStyle = {
+const primaryButtonStyle = {
+  padding: '11px 16px',
+  border: '1px solid #635bff',
+  borderRadius: 8,
+  background: '#635bff',
+  color: '#fff',
+  cursor: 'pointer',
+  fontWeight: 700,
+} satisfies React.CSSProperties
+
+const secondaryButtonStyle = {
   padding: '10px 14px',
   border: '1px solid #cfd4e2',
   borderRadius: 8,
