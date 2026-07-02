@@ -65,8 +65,14 @@ async function loadBrandingImageDataUrl(src: string, width: number, height: numb
           return
         }
 
+        const scale = Math.min(width / image.naturalWidth, height / image.naturalHeight)
+        const drawWidth = image.naturalWidth * scale
+        const drawHeight = image.naturalHeight * scale
+        const drawX = (width - drawWidth) / 2
+        const drawY = (height - drawHeight) / 2
+
         context.clearRect(0, 0, width, height)
-        context.drawImage(image, 0, 0, width, height)
+        context.drawImage(image, drawX, drawY, drawWidth, drawHeight)
         URL.revokeObjectURL(objectUrl)
         resolve(canvas.toDataURL('image/png'))
       }
@@ -83,13 +89,16 @@ async function loadBrandingImageDataUrl(src: string, width: number, height: numb
 
 async function drawPaymentLogos(pdf: jsPDF, centerX: number, y: number) {
   const [applePayLogo, googlePayLogo] = await Promise.all([
-    loadBrandingImageDataUrl(BRANDING_ASSETS.applePay, 420, 160),
-    loadBrandingImageDataUrl(BRANDING_ASSETS.googlePay, 520, 160),
+    loadBrandingImageDataUrl(BRANDING_ASSETS.applePay, 640, 220),
+    loadBrandingImageDataUrl(BRANDING_ASSETS.googlePay, 640, 220),
   ])
+  const logoWidth = 42
+  const logoHeight = 14
+  const logoGap = 12
 
   if (applePayLogo && googlePayLogo) {
-    pdf.addImage(applePayLogo, 'PNG', centerX - 58, y - 9, 42, 16)
-    pdf.addImage(googlePayLogo, 'PNG', centerX + 14, y - 9, 52, 16)
+    pdf.addImage(applePayLogo, 'PNG', centerX - logoWidth - logoGap / 2, y - logoHeight / 2, logoWidth, logoHeight)
+    pdf.addImage(googlePayLogo, 'PNG', centerX + logoGap / 2, y - logoHeight / 2, logoWidth, logoHeight)
   }
 }
 
@@ -106,13 +115,11 @@ async function drawFooterBranding(pdf: jsPDF, centerX: number, pageHeight: numbe
   pdf.text('Powered by', centerX, pageHeight - 39, { align: 'center' })
 
   if (stripeLogo) {
-    pdf.addImage(stripeLogo, 'PNG', centerX - 13, pageHeight - 35, 26, 8)
+    pdf.addImage(stripeLogo, 'PNG', centerX - 12, pageHeight - 35, 24, 7)
   }
 
-  pdf.text('via', centerX, pageHeight - 19, { align: 'center' })
-
   if (cobrixLogo) {
-    pdf.addImage(cobrixLogo, 'PNG', centerX - 18, pageHeight - 16, 36, 12)
+    pdf.addImage(cobrixLogo, 'PNG', centerX - 15, pageHeight - 22, 30, 10)
   }
 }
 
