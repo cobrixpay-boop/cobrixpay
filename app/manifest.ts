@@ -3,7 +3,7 @@ import type { MetadataRoute } from 'next'
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: 'Cobrix Pay',
-    short_name: 'Cobrix',
+    short_name: 'Cobrix Pay',
     start_url: '/login',
     display: 'standalone',
     background_color: '#f5f7fb',
