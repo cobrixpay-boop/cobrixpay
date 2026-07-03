@@ -10,8 +10,13 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: '#151a2d',
     icons: [
       {
-        src: '/branding/cobrix-logo.png',
-        sizes: '1350x300',
+        src: '/branding/cobrix-icon-192.png',
+        sizes: '192x192',
+        type: 'image/png',
+      },
+      {
+        src: '/branding/cobrix-icon-512.png',
+        sizes: '512x512',
         type: 'image/png',
       },
     ],
