@@ -241,11 +241,8 @@ export function DashboardActions({ merchantName, paymentLink }: DashboardActions
 }
 
 const qrSectionStyle = {
-  marginTop: 24,
-  padding: 24,
-  border: '1px solid #e2e5ee',
-  borderRadius: 8,
-  background: '#fbfcff',
+  marginTop: 0,
+  padding: 0,
   textAlign: 'center',
 } satisfies React.CSSProperties
 

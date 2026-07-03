@@ -186,15 +186,67 @@ export default async function MerchantDashboardPage({ searchParams }: MerchantDa
   const monthlySummary = monthlyData.summary
 
   return (
-    <main style={{ minHeight: '100vh', padding: '32px 16px', background: '#f5f7fb', color: '#171717' }}>
-      <section style={{ width: '100%', maxWidth: 960, margin: '0 auto' }}>
-        <div style={dashboardCardStyle}>
-          <h1 style={{ margin: 0, fontSize: 32, lineHeight: 1.2 }}>{merchant.name}</h1>
+    <main style={pageStyle}>
+      <section style={shellStyle}>
+        <header style={headerStyle}>
+          <div>
+            <p style={eyebrowStyle}>Portal del Comercio</p>
+            <h1 style={pageTitleStyle}>{merchant.name}</h1>
+          </div>
+          <div style={headerMetricStyle}>
+            <span style={headerMetricLabelStyle}>Cobrado este mes</span>
+            <strong style={headerMetricValueStyle}>{formatCurrency(monthlySummary.totalProcessed)}</strong>
+          </div>
+        </header>
 
-          <section style={summarySectionStyle}>
+        <section style={sectionStyle}>
+          <div style={sectionHeaderStyle}>
             <div>
-              <h2 style={{ margin: 0, fontSize: 24, lineHeight: 1.2 }}>Resumen mensual</h2>
-              <p style={{ margin: '6px 0 0', color: '#5b6275' }}>Desde el 1 del mes actual hasta hoy</p>
+              <p style={eyebrowStyle}>Gu&iacute;a inicial</p>
+              <h2 style={sectionTitleStyle}>Primeros pasos</h2>
+            </div>
+            <p style={sectionDescriptionStyle}>Prepar&aacute; Cobrix Pay para cobrar desde el celular y compartir tu QR.</p>
+          </div>
+
+          <div style={stepsGridStyle}>
+            <div style={stepStyle}>
+              <span style={stepIconStyle}>&#10003;</span>
+              <div>
+                <h3 style={stepTitleStyle}>Instalar Cobrix Pay</h3>
+                <p style={stepTextStyle}>Agreg&aacute; el portal a la pantalla de inicio para abrirlo como una app.</p>
+              </div>
+            </div>
+            <div style={stepStyle}>
+              <span style={stepIconStyle}>&#10003;</span>
+              <div>
+                <h3 style={stepTitleStyle}>Descargar el QR</h3>
+                <p style={stepTextStyle}>Guard&aacute; el QR en PDF o PNG para imprimirlo o tenerlo siempre a mano.</p>
+              </div>
+            </div>
+            <div style={stepStyle}>
+              <span style={stepIconStyle}>&#10003;</span>
+              <div>
+                <h3 style={stepTitleStyle}>Compartir el enlace</h3>
+                <p style={stepTextStyle}>Copi&aacute; el link permanente y envialo por WhatsApp, redes o email.</p>
+              </div>
+            </div>
+            <div style={stepStyle}>
+              <span style={stepIconStyle}>&#10003;</span>
+              <div>
+                <h3 style={stepTitleStyle}>Realizar un cobro de prueba</h3>
+                <p style={stepTextStyle}>Prob&aacute; el flujo completo para confirmar que tu comercio ya puede cobrar.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+          <section style={sectionStyle}>
+            <div style={sectionHeaderStyle}>
+              <div>
+                <p style={eyebrowStyle}>Bloque 1</p>
+                <h2 style={sectionTitleStyle}>Resumen</h2>
+              </div>
+              <p style={sectionDescriptionStyle}>Desde el 1 del mes actual hasta hoy.</p>
             </div>
 
             <div style={summaryGridStyle}>
@@ -213,8 +265,25 @@ export default async function MerchantDashboardPage({ searchParams }: MerchantDa
             </div>
           </section>
 
-          <section style={paymentsSectionStyle}>
-            <h2 style={{ margin: 0, fontSize: 24, lineHeight: 1.2 }}>Cobros del mes</h2>
+          <section style={sectionStyle}>
+            <div style={sectionHeaderStyle}>
+              <div>
+                <p style={eyebrowStyle}>Bloque 2</p>
+                <h2 style={sectionTitleStyle}>Cobrar</h2>
+              </div>
+              <p style={sectionDescriptionStyle}>Us&aacute; tu QR permanente o compart&iacute; el enlace de pago del comercio.</p>
+            </div>
+            <DashboardActions merchantName={merchant.name} paymentLink={paymentLink} />
+          </section>
+
+          <section style={sectionStyle}>
+            <div style={sectionHeaderStyle}>
+              <div>
+                <p style={eyebrowStyle}>Bloque 3</p>
+                <h2 style={sectionTitleStyle}>Actividad</h2>
+              </div>
+              <p style={sectionDescriptionStyle}>Consult&aacute; los cobros registrados durante el mes actual.</p>
+            </div>
 
             {monthlyData.payments.length > 0 ? (
               <div style={{ marginTop: 16, overflowX: 'auto' }}>
@@ -248,55 +317,174 @@ export default async function MerchantDashboardPage({ searchParams }: MerchantDa
             )}
           </section>
 
-          {!hasStripeAccount && (
-            <p style={{ margin: '18px 0 0', color: '#7a4b00', fontWeight: 700 }}>
-              Completá la configuración de Stripe para poder recibir pagos.
-            </p>
-          )}
+          <section style={sectionStyle}>
+            <div style={sectionHeaderStyle}>
+              <div>
+                <p style={eyebrowStyle}>Bloque 4</p>
+                <h2 style={sectionTitleStyle}>Mi Cuenta</h2>
+              </div>
+              <p style={sectionDescriptionStyle}>Acced&eacute; a la configuraci&oacute;n operativa de tu comercio.</p>
+            </div>
 
-          <DashboardActions merchantName={merchant.name} paymentLink={paymentLink} />
-
-          {stripeErrorMessage && (
-            <p role="alert" style={{ margin: '18px 0 0', color: '#b00020', fontWeight: 700 }}>
-              {stripeErrorMessage}
-            </p>
-          )}
-
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 24 }}>
-            {hasStripeAccount && (
-              <a href="/api/stripe/express-login" style={primaryLinkStyle}>
-                Ver mi cuenta Stripe
-              </a>
-            )}
             {!hasStripeAccount && (
-              <a
-                href={process.env.NEXT_PUBLIC_STRIPE_ONBOARDING_URL || 'mailto:notificaciones@cobrixpay.com?subject=Completar alta Stripe'}
-                style={secondaryLinkStyle}
-              >
-                Completar alta Stripe
-              </a>
+              <p style={accountNoticeStyle}>Complet&aacute; la configuraci&oacute;n de Stripe para poder recibir pagos.</p>
             )}
-          </div>
-        </div>
+
+            {stripeErrorMessage && (
+              <p role="alert" style={accountErrorStyle}>
+                {stripeErrorMessage}
+              </p>
+            )}
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 18 }}>
+              {hasStripeAccount && (
+                <a href="/api/stripe/express-login" style={primaryLinkStyle}>
+                  Ver mi cuenta Stripe
+                </a>
+              )}
+              {!hasStripeAccount && (
+                <a
+                  href={process.env.NEXT_PUBLIC_STRIPE_ONBOARDING_URL || 'mailto:notificaciones@cobrixpay.com?subject=Completar alta Stripe'}
+                  style={secondaryLinkStyle}
+                >
+                  Completar alta Stripe
+                </a>
+              )}
+            </div>
+          </section>
       </section>
     </main>
   )
 }
 
-const dashboardCardStyle = {
-  padding: 28,
+const pageStyle = {
+  minHeight: '100vh',
+  padding: '32px 16px',
+  background: '#f5f7fb',
+  color: '#171717',
+} satisfies React.CSSProperties
+
+const shellStyle = {
+  width: '100%',
+  maxWidth: 1100,
+  margin: '0 auto',
+} satisfies React.CSSProperties
+
+const headerStyle = {
+  display: 'flex',
+  alignItems: 'stretch',
+  justifyContent: 'space-between',
+  gap: 16,
+  flexWrap: 'wrap',
+  marginBottom: 18,
+} satisfies React.CSSProperties
+
+const pageTitleStyle = {
+  margin: 0,
+  fontSize: 34,
+  lineHeight: 1.15,
+} satisfies React.CSSProperties
+
+const headerMetricStyle = {
+  minWidth: 240,
+  padding: 18,
+  border: '1px solid #d7dce9',
+  borderRadius: 8,
+  background: '#151a2d',
+  color: '#fff',
+} satisfies React.CSSProperties
+
+const headerMetricLabelStyle = {
+  display: 'block',
+  color: '#cbd5e1',
+  fontSize: 13,
+  fontWeight: 700,
+} satisfies React.CSSProperties
+
+const headerMetricValueStyle = {
+  display: 'block',
+  marginTop: 8,
+  fontSize: 30,
+  lineHeight: 1.1,
+} satisfies React.CSSProperties
+
+const sectionStyle = {
+  marginTop: 16,
+  padding: 24,
   border: '1px solid #e2e5ee',
   borderRadius: 8,
   background: '#fff',
-  boxShadow: '0 10px 30px rgba(23, 23, 23, 0.05)',
+  boxShadow: '0 10px 30px rgba(23, 23, 23, 0.04)',
 } satisfies React.CSSProperties
 
-const summarySectionStyle = {
-  marginTop: 24,
-  padding: 20,
+const sectionHeaderStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  gap: 16,
+  flexWrap: 'wrap',
+  marginBottom: 18,
+} satisfies React.CSSProperties
+
+const eyebrowStyle = {
+  margin: 0,
+  color: '#5b6275',
+  fontSize: 12,
+  fontWeight: 800,
+  textTransform: 'uppercase',
+} satisfies React.CSSProperties
+
+const sectionTitleStyle = {
+  margin: '4px 0 0',
+  fontSize: 24,
+  lineHeight: 1.2,
+} satisfies React.CSSProperties
+
+const sectionDescriptionStyle = {
+  maxWidth: 360,
+  margin: 0,
+  color: '#5b6275',
+  lineHeight: 1.5,
+} satisfies React.CSSProperties
+
+const stepsGridStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+  gap: 12,
+} satisfies React.CSSProperties
+
+const stepStyle = {
+  display: 'flex',
+  alignItems: 'flex-start',
+  gap: 12,
+  padding: 16,
   border: '1px solid #e2e5ee',
   borderRadius: 8,
   background: '#fbfcff',
+} satisfies React.CSSProperties
+
+const stepIconStyle = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: 28,
+  height: 28,
+  flex: '0 0 28px',
+  borderRadius: 999,
+  background: '#11a36a',
+  color: '#fff',
+  fontWeight: 800,
+} satisfies React.CSSProperties
+
+const stepTitleStyle = {
+  margin: 0,
+  fontSize: 16,
+  lineHeight: 1.3,
+} satisfies React.CSSProperties
+
+const stepTextStyle = {
+  margin: '6px 0 0',
+  color: '#5b6275',
+  lineHeight: 1.45,
 } satisfies React.CSSProperties
 
 const summaryGridStyle = {
@@ -322,16 +510,8 @@ const summaryLabelStyle = {
 const summaryValueStyle = {
   display: 'block',
   marginTop: 8,
-  fontSize: 24,
+  fontSize: 28,
   lineHeight: 1.2,
-} satisfies React.CSSProperties
-
-const paymentsSectionStyle = {
-  marginTop: 18,
-  padding: 20,
-  border: '1px solid #e2e5ee',
-  borderRadius: 8,
-  background: '#fff',
 } satisfies React.CSSProperties
 
 const paymentsTableStyle = {
@@ -352,6 +532,26 @@ const paymentsCellStyle = {
   padding: '12px 8px',
   borderBottom: '1px solid #eef1f7',
   textAlign: 'left',
+} satisfies React.CSSProperties
+
+const accountNoticeStyle = {
+  margin: 0,
+  padding: 14,
+  border: '1px solid #f3d08a',
+  borderRadius: 8,
+  background: '#fff8e6',
+  color: '#7a4b00',
+  fontWeight: 700,
+} satisfies React.CSSProperties
+
+const accountErrorStyle = {
+  margin: '14px 0 0',
+  padding: 14,
+  border: '1px solid #f0b7c1',
+  borderRadius: 8,
+  background: '#fff5f7',
+  color: '#b00020',
+  fontWeight: 700,
 } satisfies React.CSSProperties
 
 const primaryLinkStyle = {
