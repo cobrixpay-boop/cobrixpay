@@ -1,0 +1,370 @@
+.shell {
+  min-height: 100vh;
+  padding: 28px;
+  background: #f5f7fb;
+  color: #151a2d;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  max-width: 1180px;
+  margin: 0 auto 18px;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 34px;
+  line-height: 1.1;
+  letter-spacing: 0;
+}
+
+.header p {
+  margin: 8px 0 0;
+  color: #667085;
+  font-size: 17px;
+}
+
+.headerBadge {
+  flex: 0 0 auto;
+  padding: 9px 12px;
+  border: 1px solid #d7deec;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #475467;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.copilotCard,
+.panel,
+.milestone {
+  max-width: 1180px;
+  margin: 0 auto;
+  border: 1px solid #dce3ef;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 18px 50px rgba(21, 26, 45, 0.08);
+}
+
+.copilotCard {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 18px;
+  padding: 26px;
+  background: linear-gradient(135deg, #151a2d 0%, #203459 58%, #1b6b67 100%);
+  color: #ffffff;
+}
+
+.copilotIcon {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  color: #b8f3dd;
+  font-weight: 800;
+  font-size: 13px;
+  text-transform: uppercase;
+}
+
+.copilotCard h2 {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.15;
+  letter-spacing: 0;
+}
+
+.copilotText {
+  max-width: 760px;
+  margin: 12px 0 0;
+  color: #e5edf8;
+  font-size: 17px;
+  line-height: 1.55;
+}
+
+.actionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.actionRow button,
+.opportunity button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #151a2d;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.actionRow .secondaryButton {
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr);
+  gap: 16px;
+  max-width: 1180px;
+  margin: 16px auto;
+}
+
+.panel {
+  padding: 22px;
+}
+
+.sectionTitle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.sectionTitle h2 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.2;
+  letter-spacing: 0;
+}
+
+.metricGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.metric {
+  min-height: 98px;
+  padding: 16px;
+  border: 1px solid #e3e8f2;
+  border-radius: 8px;
+  background: #f9fbff;
+}
+
+.metric span,
+.progressBlock span {
+  display: block;
+  color: #667085;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.metric strong {
+  display: block;
+  margin-top: 12px;
+  font-size: 26px;
+  line-height: 1.1;
+  letter-spacing: 0;
+}
+
+.emptyText,
+.mutedText,
+.positiveText,
+.warningText {
+  margin: 16px 0 0;
+  color: #667085;
+  line-height: 1.55;
+}
+
+.positiveText {
+  color: #067647;
+  font-weight: 700;
+}
+
+.warningText {
+  color: #b54708;
+  font-weight: 700;
+}
+
+.progressBlock + .progressBlock {
+  margin-top: 18px;
+}
+
+.progressBlock > div:first-child {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.progressBlock strong {
+  font-size: 18px;
+}
+
+.progressTrack {
+  overflow: hidden;
+  height: 12px;
+  margin-top: 10px;
+  border-radius: 999px;
+  background: #e7ecf5;
+}
+
+.progressTrack span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #11a37f;
+}
+
+.opportunityList {
+  display: grid;
+  gap: 10px;
+}
+
+.opportunity {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 16px;
+  border: 1px solid #e3e8f2;
+  border-radius: 8px;
+  background: #fbfcff;
+}
+
+.opportunity h3 {
+  margin: 0;
+  font-size: 17px;
+  letter-spacing: 0;
+}
+
+.opportunity p {
+  margin: 6px 0 0;
+  color: #667085;
+  line-height: 1.45;
+}
+
+.opportunity button {
+  border: 1px solid #cfd7e6;
+  background: #ffffff;
+}
+
+.milestone {
+  margin-top: 16px;
+  margin-bottom: 16px;
+  padding: 20px 22px;
+  border-left: 5px solid #11a37f;
+}
+
+.milestone span {
+  display: block;
+  color: #667085;
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.milestone strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 22px;
+}
+
+.milestone p {
+  margin: 6px 0 0;
+  color: #667085;
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  min-width: 1040px;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.table th,
+.table td {
+  padding: 13px 12px;
+  border-bottom: 1px solid #e7ecf5;
+  text-align: left;
+  vertical-align: top;
+}
+
+.table th {
+  color: #667085;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.table td strong,
+.table td span {
+  display: block;
+}
+
+.table td span {
+  margin-top: 3px;
+  color: #667085;
+  font-size: 12px;
+}
+
+.table a {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 10px;
+  border: 1px solid #cfd7e6;
+  border-radius: 8px;
+  color: #151a2d;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+@media (max-width: 860px) {
+  .shell {
+    padding: 18px 12px;
+  }
+
+  .header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .header h1 {
+    font-size: 29px;
+  }
+
+  .headerBadge {
+    width: fit-content;
+  }
+
+  .copilotCard {
+    grid-template-columns: 1fr;
+    padding: 20px;
+  }
+
+  .grid,
+  .metricGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .opportunity {
+    grid-template-columns: 1fr;
+  }
+
+  .opportunity button {
+    width: 100%;
+  }
+}

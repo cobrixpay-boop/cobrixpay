@@ -8,6 +8,20 @@ export type Merchant = {
   stripeAccountId?: string
   status?: string
   applicationFeePercent?: number
+  phone?: string
+  websiteOrInstagram?: string
+  city?: string
+  country?: string
+  source?: string
+  salesRepName?: string
+  salesRepCommissionPercent?: number
+  salesRepCommissionStartDate?: string
+  salesRepCommissionEndDate?: string
+  commercialPartnerName?: string
+  commercialPartnerType?: string
+  commercialPartnerCommissionPercent?: number
+  commercialPartnerCommissionStartDate?: string
+  commercialPartnerCommissionEndDate?: string
 }
 
 const defaultMerchants: Record<string, Merchant> = {
@@ -26,6 +40,16 @@ type StoredMerchant = Partial<Omit<Merchant, 'notificationEmails'>> & {
 
 function normalizeSlug(slug: string) {
   return slug.trim().toLowerCase()
+}
+
+function optionalString(value: unknown) {
+  return typeof value === 'string' ? value : undefined
+}
+
+function optionalNumber(value: unknown) {
+  if (value === undefined || value === null || value === '') return undefined
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : undefined
 }
 
 function normalizeMerchantRecord(merchant: StoredMerchant, key: string): Merchant {
@@ -47,6 +71,20 @@ function normalizeMerchantRecord(merchant: StoredMerchant, key: string): Merchan
     stripeAccountId: merchant.stripeAccountId,
     status: merchant.status || 'pending',
     applicationFeePercent: Number(merchant.applicationFeePercent || 0),
+    phone: optionalString(merchant.phone),
+    websiteOrInstagram: optionalString(merchant.websiteOrInstagram),
+    city: optionalString(merchant.city),
+    country: optionalString(merchant.country),
+    source: optionalString(merchant.source),
+    salesRepName: optionalString(merchant.salesRepName),
+    salesRepCommissionPercent: optionalNumber(merchant.salesRepCommissionPercent),
+    salesRepCommissionStartDate: optionalString(merchant.salesRepCommissionStartDate),
+    salesRepCommissionEndDate: optionalString(merchant.salesRepCommissionEndDate),
+    commercialPartnerName: optionalString(merchant.commercialPartnerName),
+    commercialPartnerType: optionalString(merchant.commercialPartnerType),
+    commercialPartnerCommissionPercent: optionalNumber(merchant.commercialPartnerCommissionPercent),
+    commercialPartnerCommissionStartDate: optionalString(merchant.commercialPartnerCommissionStartDate),
+    commercialPartnerCommissionEndDate: optionalString(merchant.commercialPartnerCommissionEndDate),
   }
 }
 
