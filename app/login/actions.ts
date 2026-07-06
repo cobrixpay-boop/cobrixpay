@@ -2,8 +2,9 @@
 
 import { Resend } from 'resend'
 import { getMerchantByEmail } from '@/lib/merchants'
-import { createMerchantMagicLinkToken } from '@/lib/merchant-session'
+import { createFounderMagicLinkToken, createMerchantMagicLinkToken } from '@/lib/merchant-session'
 import { getSiteUrl } from '@/lib/site-url'
+import { getFounderByEmail, normalizeEmail } from '@/lib/users'
 
 async function sendMagicLink(email: string, link: string) {
   const resend = new Resend(process.env.RESEND_API_KEY)
@@ -22,7 +23,21 @@ export type MerchantLoginState = {
 }
 
 export async function requestMerchantLogin(_previousState: MerchantLoginState, formData: FormData): Promise<MerchantLoginState> {
-  const email = String(formData.get('email') || '').trim().toLowerCase()
+  const email = normalizeEmail(String(formData.get('email') || ''))
+  const founder = getFounderByEmail(email)
+
+  if (founder) {
+    const token = await createFounderMagicLinkToken(founder.email)
+    const magicLink = `${getSiteUrl()}/login/verify?token=${encodeURIComponent(token)}`
+
+    await sendMagicLink(founder.email, magicLink)
+
+    return {
+      status: 'success',
+      message: 'Te enviamos un enlace de acceso a tu correo',
+    } satisfies MerchantLoginState
+  }
+
   const merchant = await getMerchantByEmail(email)
 
   if (!merchant) {

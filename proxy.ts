@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ADMIN_SESSION_COOKIE, isValidAdminSession } from './lib/admin-session'
-import { MERCHANT_SESSION_COOKIE, verifyMerchantToken } from './lib/merchant-session'
+import { MERCHANT_SESSION_COOKIE, getSessionUser } from './lib/merchant-session'
 
 export async function proxy(request: NextRequest) {
-  if (request.nextUrl.pathname.startsWith('/merchants/admin') || request.nextUrl.pathname.startsWith('/control')) {
+  if (request.nextUrl.pathname.startsWith('/merchants/admin')) {
     const sessionValue = request.cookies.get(ADMIN_SESSION_COOKIE)?.value
     const isAdminSessionValid = await isValidAdminSession(sessionValue)
 
@@ -14,11 +14,27 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL('/admin/login', request.url))
   }
 
-  const merchantSession = request.cookies.get(MERCHANT_SESSION_COOKIE)?.value
-  const isMerchantSessionValid = await verifyMerchantToken(merchantSession, 'session')
+  const sessionToken = request.cookies.get(MERCHANT_SESSION_COOKIE)?.value
+  const sessionUser = await getSessionUser(sessionToken)
 
-  if (isMerchantSessionValid) {
+  if (request.nextUrl.pathname.startsWith('/control')) {
+    if (sessionUser?.role === 'FOUNDER') {
+      return NextResponse.next()
+    }
+
+    if (sessionUser?.role === 'MERCHANT') {
+      return NextResponse.redirect(new URL('/comercio/dashboard', request.url))
+    }
+
+    return NextResponse.redirect(new URL('/login', request.url))
+  }
+
+  if (sessionUser?.role === 'MERCHANT') {
     return NextResponse.next()
+  }
+
+  if (sessionUser?.role === 'FOUNDER') {
+    return NextResponse.redirect(new URL('/control', request.url))
   }
 
   return NextResponse.redirect(new URL('/login', request.url))

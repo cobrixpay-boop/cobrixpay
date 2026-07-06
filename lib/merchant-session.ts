@@ -1,4 +1,5 @@
 import { getMerchantBySlug } from './merchants'
+import { getFounderByEmail, normalizeEmail, type UserRole } from './users'
 
 export const MERCHANT_SESSION_COOKIE = 'merchant_session'
 
@@ -6,10 +7,11 @@ const MAGIC_LINK_MAX_AGE_SECONDS = 15 * 60
 const MERCHANT_SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7
 
 type MerchantAuthPayload = {
-  slug: string
+  slug?: string
   email: string
   exp: number
   purpose: 'magic-link' | 'session'
+  role?: UserRole
 }
 
 function getMerchantAuthSecret() {
@@ -68,6 +70,7 @@ export async function createMerchantMagicLinkToken(slug: string, email: string) 
   return createToken({
     slug,
     email,
+    role: 'MERCHANT',
     purpose: 'magic-link',
     exp: Math.floor(Date.now() / 1000) + MAGIC_LINK_MAX_AGE_SECONDS,
   })
@@ -77,6 +80,25 @@ export async function createMerchantSessionToken(slug: string, email: string) {
   return createToken({
     slug,
     email,
+    role: 'MERCHANT',
+    purpose: 'session',
+    exp: Math.floor(Date.now() / 1000) + MERCHANT_SESSION_MAX_AGE_SECONDS,
+  })
+}
+
+export async function createFounderMagicLinkToken(email: string) {
+  return createToken({
+    email,
+    role: 'FOUNDER',
+    purpose: 'magic-link',
+    exp: Math.floor(Date.now() / 1000) + MAGIC_LINK_MAX_AGE_SECONDS,
+  })
+}
+
+export async function createFounderSessionToken(email: string) {
+  return createToken({
+    email,
+    role: 'FOUNDER',
     purpose: 'session',
     exp: Math.floor(Date.now() / 1000) + MERCHANT_SESSION_MAX_AGE_SECONDS,
   })
@@ -96,18 +118,40 @@ export async function verifyMerchantToken(token: string | undefined, purpose: Me
 
     if (payload.purpose !== purpose || payload.exp < Math.floor(Date.now() / 1000)) return null
 
-    return payload
+    return {
+      ...payload,
+      role: payload.role || 'MERCHANT',
+    }
   } catch {
     return null
   }
 }
 
-export async function getMerchantFromSession(sessionToken: string | undefined) {
+export async function getSessionUser(sessionToken: string | undefined) {
   const payload = await verifyMerchantToken(sessionToken, 'session')
   if (!payload) return null
 
+  if (payload.role === 'FOUNDER') {
+    return getFounderByEmail(payload.email) || null
+  }
+
+  if (!payload.slug) return null
+
   const merchant = await getMerchantBySlug(payload.slug)
-  if (!merchant || merchant.email.trim().toLowerCase() !== payload.email.trim().toLowerCase()) return null
+  if (!merchant || normalizeEmail(merchant.email) !== normalizeEmail(payload.email)) return null
+
+  return {
+    ...merchant,
+    role: 'MERCHANT' as const,
+  }
+}
+
+export async function getMerchantFromSession(sessionToken: string | undefined) {
+  const payload = await verifyMerchantToken(sessionToken, 'session')
+  if (!payload || payload.role !== 'MERCHANT' || !payload.slug) return null
+
+  const merchant = await getMerchantBySlug(payload.slug)
+  if (!merchant || normalizeEmail(merchant.email) !== normalizeEmail(payload.email)) return null
 
   return merchant
 }
