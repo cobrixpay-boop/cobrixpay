@@ -80,7 +80,7 @@ export async function POST(req: Request) {
         },
       ],
       payment_intent_data: paymentIntentData,
-      success_url: `${baseUrl}/success`,
+      success_url: `${baseUrl}/success?merchant=${encodeURIComponent(merchantSlug)}`,
       cancel_url: `${baseUrl}/cancel?merchant=${encodeURIComponent(merchantSlug)}`,
     })
 

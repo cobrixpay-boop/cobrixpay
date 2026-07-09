@@ -6,6 +6,8 @@ export type Merchant = {
   email: string
   notificationEmails: string[]
   stripeAccountId?: string
+  postPaymentUrl?: string
+  whatsapp?: string
   status?: string
   applicationFeePercent?: number
   phone?: string
@@ -69,6 +71,8 @@ function normalizeMerchantRecord(merchant: StoredMerchant, key: string): Merchan
     email,
     notificationEmails,
     stripeAccountId: merchant.stripeAccountId,
+    postPaymentUrl: optionalString(merchant.postPaymentUrl),
+    whatsapp: optionalString(merchant.whatsapp),
     status: merchant.status || 'pending',
     applicationFeePercent: Number(merchant.applicationFeePercent || 0),
     phone: optionalString(merchant.phone),

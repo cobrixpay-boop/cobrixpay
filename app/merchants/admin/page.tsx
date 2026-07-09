@@ -8,6 +8,8 @@ type Merchant = {
   email: string
   notificationEmails?: string[]
   stripeAccountId?: string
+  postPaymentUrl?: string
+  whatsapp?: string
   applicationFeePercent?: number
 }
 
@@ -20,16 +22,20 @@ type StorageStatus = {
 export default function AdminMerchants() {
   const [merchants, setMerchants] = useState<Record<string, Merchant>>({})
   const [storageStatus, setStorageStatus] = useState<StorageStatus | null>(null)
-  const [adminToken, setAdminToken] = useState('')
+  const [adminToken, setAdminToken] = useState(() =>
+    typeof window === 'undefined' ? '' : window.localStorage.getItem('cobrix-admin-token') || ''
+  )
   const [slug, setSlug] = useState('')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [notificationEmails, setNotificationEmails] = useState('')
   const [stripeAccountId, setStripeAccountId] = useState('')
+  const [postPaymentUrl, setPostPaymentUrl] = useState('')
+  const [whatsapp, setWhatsapp] = useState('')
   const [applicationFeePercent, setApplicationFeePercent] = useState('0')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
-  const [baseUrl, setBaseUrl] = useState('')
+  const [baseUrl] = useState(() => (typeof window === 'undefined' ? '' : window.location.origin))
   const [editingSlug, setEditingSlug] = useState('')
 
   function getAdminHeaders(): Record<string, string> {
@@ -64,11 +70,12 @@ export default function AdminMerchants() {
   }
 
   useEffect(() => {
-    const storedToken = window.localStorage.getItem('cobrix-admin-token') || ''
-    setBaseUrl(window.location.origin)
-    setAdminToken(storedToken)
-    fetchStorageStatus()
-    fetchMerchants(storedToken)
+    const token = adminToken
+    window.setTimeout(() => {
+      fetchStorageStatus()
+      fetchMerchants(token)
+    }, 0)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   function handleTokenChange(value: string) {
@@ -91,6 +98,8 @@ export default function AdminMerchants() {
     setEmail(merchant.email)
     setNotificationEmails(merchant.notificationEmails?.join(', ') || '')
     setStripeAccountId(merchant.stripeAccountId || '')
+    setPostPaymentUrl(merchant.postPaymentUrl || '')
+    setWhatsapp(merchant.whatsapp || '')
     setApplicationFeePercent(String(merchant.applicationFeePercent || 0))
     setMessage(`Editando comercio: ${merchant.slug}`)
   }
@@ -102,6 +111,8 @@ export default function AdminMerchants() {
     setEmail('')
     setNotificationEmails('')
     setStripeAccountId('')
+    setPostPaymentUrl('')
+    setWhatsapp('')
     setApplicationFeePercent('0')
   }
 
@@ -114,7 +125,16 @@ export default function AdminMerchants() {
       const res = await fetch('/api/merchants', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getAdminHeaders() },
-        body: JSON.stringify({ slug, name, email, notificationEmails, stripeAccountId, applicationFeePercent }),
+        body: JSON.stringify({
+          slug,
+          name,
+          email,
+          notificationEmails,
+          stripeAccountId,
+          postPaymentUrl,
+          whatsapp,
+          applicationFeePercent,
+        }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Error')
@@ -123,8 +143,9 @@ export default function AdminMerchants() {
       setMerchants((current) => ({ ...current, [data.merchant.slug]: data.merchant }))
       await fetchMerchants()
       setMessage(`${editingSlug ? 'Comercio actualizado' : 'Comercio creado'}: /pay/${data.merchant.slug}`)
-    } catch (err: any) {
-      setMessage('Error: ' + (err.message || 'No se pudo crear el comercio'))
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'No se pudo crear el comercio'
+      setMessage('Error: ' + errorMessage)
     }
 
     setLoading(false)
@@ -227,6 +248,28 @@ export default function AdminMerchants() {
           />
         </div>
         <div style={{ marginBottom: 12 }}>
+          <label style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>URL despues del pago</label>
+          <input
+            value={postPaymentUrl}
+            onChange={(e) => setPostPaymentUrl(e.target.value)}
+            type="url"
+            pattern="https?://.+"
+            placeholder="https://www.comercio.com"
+            style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid #ccc' }}
+          />
+          <small style={{ color: '#666' }}>Opcional. Debe empezar con http:// o https://.</small>
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>WhatsApp del comercio</label>
+          <input
+            value={whatsapp}
+            onChange={(e) => setWhatsapp(e.target.value)}
+            type="text"
+            placeholder="+54 9 11 1234-5678"
+            style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid #ccc' }}
+          />
+        </div>
+        <div style={{ marginBottom: 12 }}>
           <label style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>Comision Cobrix (%)</label>
           <input
             value={applicationFeePercent}
@@ -301,6 +344,8 @@ export default function AdminMerchants() {
                   <div style={{ color: '#555' }}>Notificaciones: {merchant.notificationEmails.join(', ')}</div>
                 )}
                 {merchant.stripeAccountId && <div style={{ color: '#555' }}>Stripe: {merchant.stripeAccountId}</div>}
+                {merchant.postPaymentUrl && <div style={{ color: '#555' }}>URL post-pago: {merchant.postPaymentUrl}</div>}
+                {merchant.whatsapp && <div style={{ color: '#555' }}>WhatsApp: {merchant.whatsapp}</div>}
                 <div style={{ color: '#555' }}>Comision Cobrix: {merchant.applicationFeePercent || 0}%</div>
                 <div style={{ color: '#555' }}>slug: {merchant.slug}</div>
                 <div style={{ color: '#555' }}>link: {baseUrl}/pay/{merchant.slug}</div>
