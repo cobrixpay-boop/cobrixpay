@@ -97,6 +97,8 @@ function main() {
     email,
     notificationEmails: parsedNotificationEmails,
     status: 'pending_documents',
+    archived: false,
+    everActive: false,
     applicationFeePercent: parsedApplicationFeePercent,
   }
 

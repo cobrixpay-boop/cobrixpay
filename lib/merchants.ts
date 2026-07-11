@@ -19,6 +19,9 @@ export type Merchant = {
   postPaymentUrl?: string
   whatsapp?: string
   status: MerchantStatus
+  archived: boolean
+  archivedReason?: 'admin' | 'compliance'
+  everActive?: boolean
   applicationFeePercent?: number
   phone?: string
   websiteOrInstagram?: string
@@ -43,6 +46,8 @@ const defaultMerchants: Record<string, Merchant> = {
     email: 'notificaciones@cobrixpay.com',
     notificationEmails: ['notificaciones@cobrixpay.com'],
     status: 'active',
+    archived: false,
+    everActive: true,
   },
 }
 
@@ -78,7 +83,12 @@ export function isValidStripeAccountId(value: unknown): value is string {
 }
 
 export function canMerchantAcceptPayments(merchant: Merchant | undefined) {
-  return Boolean(merchant && merchant.status === 'active' && isValidStripeAccountId(merchant.stripeAccountId))
+  return Boolean(
+    merchant &&
+      !merchant.archived &&
+      merchant.status === 'active' &&
+      isValidStripeAccountId(merchant.stripeAccountId)
+  )
 }
 
 function normalizeMerchantRecord(merchant: StoredMerchant, key: string): Merchant {
@@ -101,6 +111,10 @@ function normalizeMerchantRecord(merchant: StoredMerchant, key: string): Merchan
     postPaymentUrl: optionalString(merchant.postPaymentUrl),
     whatsapp: optionalString(merchant.whatsapp),
     status: normalizeMerchantStatus(merchant.status),
+    archived: merchant.archived === true,
+    archivedReason:
+      merchant.archivedReason === 'compliance' ? 'compliance' : merchant.archivedReason === 'admin' ? 'admin' : undefined,
+    everActive: merchant.everActive === true || merchant.status === 'active',
     applicationFeePercent: Number(merchant.applicationFeePercent || 0),
     phone: optionalString(merchant.phone),
     websiteOrInstagram: optionalString(merchant.websiteOrInstagram),
@@ -148,7 +162,17 @@ export async function listMerchants() {
 
 export async function saveMerchant(merchant: Merchant) {
   const merchants = await readMerchantStorage()
-  merchants[merchant.slug] = merchant
+  merchants[merchant.slug] = {
+    ...merchant,
+    archived: merchant.archived === true,
+    everActive: merchant.everActive === true || merchant.status === 'active',
+  }
+  await writeMerchantStorage(merchants)
+}
+
+export async function deleteMerchant(slug: string) {
+  const merchants = await readMerchantStorage()
+  delete merchants[normalizeSlug(slug)]
   await writeMerchantStorage(merchants)
 }
 

@@ -13,6 +13,9 @@ type Merchant = {
   postPaymentUrl?: string
   whatsapp?: string
   status: MerchantStatus
+  archived: boolean
+  archivedReason?: 'admin' | 'compliance'
+  everActive?: boolean
   applicationFeePercent?: number
 }
 
@@ -28,6 +31,18 @@ const MERCHANT_STATUS_OPTIONS: Array<{ value: MerchantStatus; label: string }> =
   { value: 'active', label: 'Activo' },
   { value: 'suspended', label: 'Suspendido' },
   { value: 'rejected', label: 'Rechazado' },
+]
+
+type MerchantFilter = 'all' | 'active' | 'pending_documents' | 'under_review' | 'suspended' | 'rejected' | 'archived'
+
+const MERCHANT_FILTER_OPTIONS: Array<{ value: MerchantFilter; label: string }> = [
+  { value: 'all', label: 'Todos' },
+  { value: 'active', label: 'Activos' },
+  { value: 'pending_documents', label: 'Pendientes' },
+  { value: 'under_review', label: 'En revision' },
+  { value: 'suspended', label: 'Suspendidos' },
+  { value: 'rejected', label: 'Rechazados' },
+  { value: 'archived', label: 'Archivados' },
 ]
 
 export default function AdminMerchants() {
@@ -49,6 +64,7 @@ export default function AdminMerchants() {
   const [message, setMessage] = useState('')
   const [baseUrl] = useState(() => (typeof window === 'undefined' ? '' : window.location.origin))
   const [editingSlug, setEditingSlug] = useState('')
+  const [filter, setFilter] = useState<MerchantFilter>('all')
 
   function getAdminHeaders(): Record<string, string> {
     return adminToken ? { 'x-admin-token': adminToken } : {}
@@ -197,7 +213,30 @@ export default function AdminMerchants() {
     return { ...base, background: '#f1f5f9', color: '#475569' }
   }
 
+  function getVisibleMerchants() {
+    return Object.values(merchants).filter((merchant) => {
+      if (filter === 'archived') return merchant.archived
+      if (merchant.archived) return false
+      if (filter === 'all') return true
+      return merchant.status === filter
+    })
+  }
+
+  function canShowDeleteButton(merchant: Merchant) {
+    return (
+      !merchant.everActive &&
+      merchant.status !== 'active' &&
+      !hasValidStripeAccountId(merchant.stripeAccountId) &&
+      merchant.archivedReason !== 'compliance'
+    )
+  }
+
   async function updateMerchantStatus(merchant: Merchant, nextStatus: MerchantStatus) {
+    if (merchant.archived && nextStatus === 'active') {
+      setMessage('No se puede activar: el comercio esta archivado. Restauralo primero.')
+      return
+    }
+
     if (nextStatus === 'active' && !hasValidStripeAccountId(merchant.stripeAccountId)) {
       setMessage('No se puede activar: falta un Stripe Account ID valido.')
       return
@@ -213,6 +252,7 @@ export default function AdminMerchants() {
         body: JSON.stringify({
           ...merchant,
           status: nextStatus,
+          archived: merchant.archived,
         }),
       })
       const data = await res.json()
@@ -227,6 +267,72 @@ export default function AdminMerchants() {
 
     setLoading(false)
   }
+
+  async function updateMerchantArchived(merchant: Merchant, archived: boolean) {
+    if (archived) {
+      const confirmed = window.confirm('Deseas archivar este comercio?\n\nPodra restaurarse posteriormente.')
+      if (!confirmed) return
+    }
+
+    setLoading(true)
+    setMessage('')
+
+    try {
+      const res = await fetch('/api/merchants', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAdminHeaders() },
+        body: JSON.stringify({
+          ...merchant,
+          archived,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Error')
+
+      setMerchants((current) => ({ ...current, [data.merchant.slug]: data.merchant }))
+      setMessage(`${archived ? 'Comercio archivado' : 'Comercio restaurado'}: ${merchant.slug}`)
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'No se pudo actualizar el archivo'
+      setMessage('Error: ' + errorMessage)
+    }
+
+    setLoading(false)
+  }
+
+  async function deleteMerchantPermanently(merchant: Merchant) {
+    const confirmationSlug = window.prompt(`Para confirmar escribi:\n\n${merchant.slug}`)
+    if (confirmationSlug === null) return
+
+    setLoading(true)
+    setMessage('')
+
+    try {
+      const res = await fetch('/api/merchants', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', ...getAdminHeaders() },
+        body: JSON.stringify({
+          slug: merchant.slug,
+          confirmationSlug,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'No se pudo eliminar el comercio')
+
+      setMerchants((current) => {
+        const next = { ...current }
+        delete next[merchant.slug]
+        return next
+      })
+      setMessage(`Comercio eliminado definitivamente: ${merchant.slug}`)
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'No se pudo eliminar el comercio'
+      setMessage('Error: ' + errorMessage)
+    }
+
+    setLoading(false)
+  }
+
+  const visibleMerchants = getVisibleMerchants()
 
   return (
     <div style={{ padding: '2rem 1rem', maxWidth: 760, margin: '0 auto' }}>
@@ -413,6 +519,25 @@ export default function AdminMerchants() {
 
       <section style={{ marginTop: 32 }}>
         <h2>Comercios existentes</h2>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+          {MERCHANT_FILTER_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => setFilter(option.value)}
+              style={{
+                padding: '8px 12px',
+                background: filter === option.value ? '#171717' : '#fff',
+                color: filter === option.value ? '#fff' : '#171717',
+                border: '1px solid #ccc',
+                borderRadius: 8,
+                cursor: 'pointer',
+              }}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
         <button
           type="button"
           onClick={() => fetchMerchants()}
@@ -428,13 +553,29 @@ export default function AdminMerchants() {
           Actualizar lista
         </button>
         <div style={{ marginTop: 12 }}>
-          {Object.keys(merchants).length === 0 && <p>No hay comercios.</p>}
+          {visibleMerchants.length === 0 && <p>No hay comercios para este filtro.</p>}
           <ul style={{ listStyle: 'none', padding: 0 }}>
-            {Object.values(merchants).map((merchant) => (
+            {visibleMerchants.map((merchant) => (
               <li key={merchant.slug} style={{ marginBottom: 12, padding: 12, background: '#f8f9ff', borderRadius: 10 }}>
                 <strong>{merchant.name}</strong>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
                   <span style={getStatusStyle(merchant.status)}>{getStatusLabel(merchant.status)}</span>
+                  {merchant.archived && (
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        padding: '4px 8px',
+                        borderRadius: 999,
+                        fontSize: 12,
+                        fontWeight: 800,
+                        background: '#eceff3',
+                        color: '#334155',
+                      }}
+                    >
+                      Archivado
+                    </span>
+                  )}
                   <span
                     style={{
                       ...getStatusStyle(hasValidStripeAccountId(merchant.stripeAccountId) ? 'active' : 'pending_documents'),
@@ -472,19 +613,22 @@ export default function AdminMerchants() {
                   <button
                     type="button"
                     onClick={() => updateMerchantStatus(merchant, 'active')}
-                    disabled={loading || !hasValidStripeAccountId(merchant.stripeAccountId)}
+                    disabled={loading || merchant.archived || !hasValidStripeAccountId(merchant.stripeAccountId)}
                     title={
-                      hasValidStripeAccountId(merchant.stripeAccountId)
+                      merchant.archived
+                        ? 'No se puede activar un comercio archivado'
+                        : hasValidStripeAccountId(merchant.stripeAccountId)
                         ? 'Activar comercio'
                         : 'No se puede activar sin Stripe Account ID valido'
                     }
                     style={{
                       padding: '8px 12px',
-                      background: hasValidStripeAccountId(merchant.stripeAccountId) ? '#1b5e20' : '#e5e7eb',
-                      color: hasValidStripeAccountId(merchant.stripeAccountId) ? '#fff' : '#6b7280',
+                      background:
+                        !merchant.archived && hasValidStripeAccountId(merchant.stripeAccountId) ? '#1b5e20' : '#e5e7eb',
+                      color: !merchant.archived && hasValidStripeAccountId(merchant.stripeAccountId) ? '#fff' : '#6b7280',
                       border: '1px solid #ccc',
                       borderRadius: 8,
-                      cursor: hasValidStripeAccountId(merchant.stripeAccountId) ? 'pointer' : 'not-allowed',
+                      cursor: !merchant.archived && hasValidStripeAccountId(merchant.stripeAccountId) ? 'pointer' : 'not-allowed',
                     }}
                   >
                     Activar
@@ -517,6 +661,55 @@ export default function AdminMerchants() {
                   >
                     Rechazar
                   </button>
+                  {!merchant.archived && (
+                    <button
+                      type="button"
+                      onClick={() => updateMerchantArchived(merchant, true)}
+                      disabled={loading}
+                      style={{
+                        padding: '8px 12px',
+                        background: '#fff',
+                        border: '1px solid #94a3b8',
+                        borderRadius: 8,
+                        cursor: loading ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      Archivar
+                    </button>
+                  )}
+                  {merchant.archived && (
+                    <button
+                      type="button"
+                      onClick={() => updateMerchantArchived(merchant, false)}
+                      disabled={loading}
+                      style={{
+                        padding: '8px 12px',
+                        background: '#fff',
+                        border: '1px solid #4caf50',
+                        borderRadius: 8,
+                        cursor: loading ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      Restaurar
+                    </button>
+                  )}
+                  {canShowDeleteButton(merchant) && (
+                    <button
+                      type="button"
+                      onClick={() => deleteMerchantPermanently(merchant)}
+                      disabled={loading}
+                      style={{
+                        padding: '8px 12px',
+                        background: '#fff5f7',
+                        color: '#b00020',
+                        border: '1px solid #f0b7c1',
+                        borderRadius: 8,
+                        cursor: loading ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      Eliminar definitivamente
+                    </button>
+                  )}
                 </div>
               </li>
             ))}

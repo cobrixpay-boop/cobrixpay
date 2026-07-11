@@ -1,5 +1,7 @@
+import Stripe from 'stripe'
 import { NextResponse } from 'next/server'
 import {
+  deleteMerchant,
   isMerchantStatus,
   isValidStripeAccountId,
   listMerchants,
@@ -64,6 +66,76 @@ function isValidPostPaymentUrl(value: string) {
   }
 }
 
+function normalizeOptionalBoolean(value: unknown, fallback: boolean) {
+  if (typeof value === 'boolean') return value
+  return fallback
+}
+
+function hasAssociatedDocuments(merchant: Merchant) {
+  const record = merchant as Merchant & Record<string, unknown>
+  const documentFields = [
+    record.documents,
+    record.documentIds,
+    record.profileDocuments,
+    record.complianceDocuments,
+    record.onboardingDocuments,
+  ]
+
+  return documentFields.some((value) => {
+    if (Array.isArray(value)) return value.length > 0
+    if (value && typeof value === 'object') return Object.keys(value).length > 0
+    return Boolean(value)
+  })
+}
+
+async function hasRegisteredPayments(merchant: Merchant) {
+  const secretKey = process.env.STRIPE_SECRET_KEY
+  if (!secretKey) return false
+
+  const stripe = new Stripe(secretKey, {
+    apiVersion: '2026-02-25.clover',
+  })
+
+  const paymentIntents = stripe.paymentIntents.list({
+    limit: 100,
+  })
+
+  for await (const paymentIntent of paymentIntents) {
+    const belongsToMerchant =
+      paymentIntent.metadata?.merchantSlug === merchant.slug ||
+      paymentIntent.metadata?.merchantName === merchant.name ||
+      Boolean(merchant.stripeAccountId && paymentIntent.transfer_data?.destination === merchant.stripeAccountId)
+
+    if (belongsToMerchant) return true
+  }
+
+  return false
+}
+
+async function getDeleteBlockReason(merchant: Merchant) {
+  if (merchant.everActive || merchant.status === 'active') {
+    return 'No se puede eliminar: el comercio estuvo activo o esta activo.'
+  }
+
+  if (isValidStripeAccountId(merchant.stripeAccountId)) {
+    return 'No se puede eliminar: el comercio tiene Stripe Account ID.'
+  }
+
+  if (await hasRegisteredPayments(merchant)) {
+    return 'No se puede eliminar: el comercio posee pagos registrados.'
+  }
+
+  if (hasAssociatedDocuments(merchant)) {
+    return 'No se puede eliminar: el comercio posee documentos asociados.'
+  }
+
+  if (merchant.archived && merchant.archivedReason === 'compliance') {
+    return 'No se puede eliminar: el comercio esta archivado por razones de compliance.'
+  }
+
+  return ''
+}
+
 export async function GET(req: Request) {
   try {
     if (!isAuthorized(req)) {
@@ -84,7 +156,18 @@ export async function POST(req: Request) {
     }
 
     const body = (await req.json()) as Record<string, unknown>
-    const { slug, name, email, stripeAccountId, notificationEmails, applicationFeePercent, postPaymentUrl, whatsapp, status } = body
+    const {
+      slug,
+      name,
+      email,
+      stripeAccountId,
+      notificationEmails,
+      applicationFeePercent,
+      postPaymentUrl,
+      whatsapp,
+      status,
+      archived,
+    } = body
     const normalizedSlug = typeof slug === 'string' ? normalizeSlug(slug) : ''
     const normalizedName = normalizeOptionalString(name)
     const normalizedEmail = normalizeOptionalString(email)
@@ -100,6 +183,7 @@ export async function POST(req: Request) {
     const existingMerchants = await listMerchants()
     const existingMerchant = existingMerchants[normalizedSlug]
     const normalizedStatus = status === undefined ? existingMerchant?.status || 'pending_documents' : status
+    const normalizedArchived = normalizeOptionalBoolean(archived, existingMerchant?.archived || false)
 
     if (normalizedStripeAccountId && !isValidStripeAccountId(normalizedStripeAccountId)) {
       return NextResponse.json({ error: 'El Stripe Account ID debe empezar con acct_' }, { status: 400 })
@@ -111,6 +195,10 @@ export async function POST(req: Request) {
 
     if (normalizedStatus === 'active' && !isValidStripeAccountId(normalizedStripeAccountId)) {
       return NextResponse.json({ error: 'No se puede activar un comercio sin Stripe Account ID valido' }, { status: 400 })
+    }
+
+    if (normalizedStatus === 'active' && normalizedArchived) {
+      return NextResponse.json({ error: 'No se puede activar un comercio archivado. Restauralo primero.' }, { status: 400 })
     }
 
     if (Number.isNaN(normalizedApplicationFeePercent)) {
@@ -130,6 +218,9 @@ export async function POST(req: Request) {
       email: normalizedEmail,
       notificationEmails: parsedNotificationEmails,
       status: normalizedStatus,
+      archived: normalizedArchived,
+      archivedReason: normalizedArchived ? existingMerchant?.archivedReason || 'admin' : undefined,
+      everActive: existingMerchant?.everActive === true || normalizedStatus === 'active',
       applicationFeePercent: normalizedApplicationFeePercent,
       ...(normalizedPostPaymentUrl ? { postPaymentUrl: normalizedPostPaymentUrl } : {}),
       ...(normalizedWhatsapp ? { whatsapp: normalizedWhatsapp } : {}),
@@ -152,6 +243,40 @@ export async function POST(req: Request) {
     await saveMerchant(merchant)
 
     return NextResponse.json({ ok: true, merchant })
+  } catch (err: unknown) {
+    return NextResponse.json({ error: getErrorMessage(err) || 'Error interno' }, { status: 500 })
+  }
+}
+
+export async function DELETE(req: Request) {
+  try {
+    if (!isAuthorized(req)) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+    }
+
+    const body = (await req.json()) as Record<string, unknown>
+    const slug = typeof body.slug === 'string' ? normalizeSlug(body.slug) : ''
+    const confirmationSlug = typeof body.confirmationSlug === 'string' ? body.confirmationSlug.trim() : ''
+
+    if (!slug || confirmationSlug !== slug) {
+      return NextResponse.json({ error: 'Para eliminar definitivamente tenes que escribir el slug exacto.' }, { status: 400 })
+    }
+
+    const merchants = await listMerchants()
+    const merchant = merchants[slug]
+
+    if (!merchant) {
+      return NextResponse.json({ error: 'No existe el comercio.' }, { status: 404 })
+    }
+
+    const blockReason = await getDeleteBlockReason(merchant)
+    if (blockReason) {
+      return NextResponse.json({ error: blockReason }, { status: 400 })
+    }
+
+    await deleteMerchant(slug)
+
+    return NextResponse.json({ ok: true })
   } catch (err: unknown) {
     return NextResponse.json({ error: getErrorMessage(err) || 'Error interno' }, { status: 500 })
   }
