@@ -1,6 +1,6 @@
 import Stripe from 'stripe'
 import { NextResponse } from 'next/server'
-import { getMerchantBySlug } from '../../../lib/merchants'
+import { canMerchantAcceptPayments, getMerchantBySlug, isValidStripeAccountId } from '../../../lib/merchants'
 
 function getStripe() {
   return new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -32,8 +32,25 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: `No existe el comercio "${slug}"` }, { status: 404 })
     }
 
-    if (!merchant.stripeAccountId) {
-      return NextResponse.json({ error: `El comercio "${merchantSlug}" no tiene Stripe Account ID` }, { status: 400 })
+    if (merchant.status !== 'active') {
+      return NextResponse.json(
+        { error: 'Este comercio todavia no esta habilitado para recibir pagos.' },
+        { status: 403 }
+      )
+    }
+
+    if (!isValidStripeAccountId(merchant.stripeAccountId)) {
+      return NextResponse.json(
+        { error: 'Este comercio todavia no tiene una cuenta Stripe conectada.' },
+        { status: 400 }
+      )
+    }
+
+    if (!canMerchantAcceptPayments(merchant)) {
+      return NextResponse.json(
+        { error: 'Este comercio no esta habilitado para recibir pagos.' },
+        { status: 403 }
+      )
     }
 
     const baseUrl = getBaseUrl()

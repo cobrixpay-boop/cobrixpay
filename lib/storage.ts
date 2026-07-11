@@ -5,7 +5,7 @@ import { Redis } from '@upstash/redis'
 const STORAGE_KEY = 'cobrix:merchants'
 let upstashClient: Redis | undefined
 
-function parseStoredMerchants(raw: unknown): Record<string, any> {
+function parseStoredMerchants(raw: unknown): Record<string, unknown> {
   if (!raw) return {}
 
   if (typeof raw === 'string') {
@@ -17,7 +17,7 @@ function parseStoredMerchants(raw: unknown): Record<string, any> {
   }
 
   if (typeof raw === 'object' && !Array.isArray(raw)) {
-    return raw as Record<string, any>
+    return raw as Record<string, unknown>
   }
 
   return {}
@@ -57,7 +57,7 @@ function getUpstashClient() {
   return upstashClient
 }
 
-export async function readMerchantStorage(): Promise<Record<string, any>> {
+export async function readMerchantStorage(): Promise<Record<string, unknown>> {
   if (usesUpstash()) {
     const raw = await getUpstashClient().get(STORAGE_KEY)
     return parseStoredMerchants(raw)
@@ -69,7 +69,7 @@ export async function readMerchantStorage(): Promise<Record<string, any>> {
   return JSON.parse(raw || '{}')
 }
 
-export async function writeMerchantStorage(data: Record<string, any>): Promise<void> {
+export async function writeMerchantStorage(data: Record<string, unknown>): Promise<void> {
   if (usesUpstash()) {
     await getUpstashClient().set(STORAGE_KEY, JSON.stringify(data))
     return

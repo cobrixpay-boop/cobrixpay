@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server'
-import { listMerchants, saveMerchant } from '../../../lib/merchants'
+import {
+  isMerchantStatus,
+  isValidStripeAccountId,
+  listMerchants,
+  saveMerchant,
+  type Merchant,
+} from '../../../lib/merchants'
 
 function isAuthorized(req: Request) {
   const adminToken = process.env.ADMIN_TOKEN
@@ -78,7 +84,7 @@ export async function POST(req: Request) {
     }
 
     const body = (await req.json()) as Record<string, unknown>
-    const { slug, name, email, stripeAccountId, notificationEmails, applicationFeePercent, postPaymentUrl, whatsapp } = body
+    const { slug, name, email, stripeAccountId, notificationEmails, applicationFeePercent, postPaymentUrl, whatsapp, status } = body
     const normalizedSlug = typeof slug === 'string' ? normalizeSlug(slug) : ''
     const normalizedName = normalizeOptionalString(name)
     const normalizedEmail = normalizeOptionalString(email)
@@ -87,12 +93,24 @@ export async function POST(req: Request) {
     const normalizedPostPaymentUrl = normalizeOptionalString(postPaymentUrl)
     const normalizedWhatsapp = normalizeOptionalString(whatsapp)
 
-    if (!normalizedSlug || !normalizedName || !normalizedEmail || !normalizedStripeAccountId) {
+    if (!normalizedSlug || !normalizedName || !normalizedEmail) {
       return NextResponse.json({ error: 'Faltan campos' }, { status: 400 })
     }
 
-    if (!normalizedStripeAccountId.startsWith('acct_')) {
+    const existingMerchants = await listMerchants()
+    const existingMerchant = existingMerchants[normalizedSlug]
+    const normalizedStatus = status === undefined ? existingMerchant?.status || 'pending_documents' : status
+
+    if (normalizedStripeAccountId && !isValidStripeAccountId(normalizedStripeAccountId)) {
       return NextResponse.json({ error: 'El Stripe Account ID debe empezar con acct_' }, { status: 400 })
+    }
+
+    if (!isMerchantStatus(normalizedStatus)) {
+      return NextResponse.json({ error: 'Estado de comercio invalido' }, { status: 400 })
+    }
+
+    if (normalizedStatus === 'active' && !isValidStripeAccountId(normalizedStripeAccountId)) {
+      return NextResponse.json({ error: 'No se puede activar un comercio sin Stripe Account ID valido' }, { status: 400 })
     }
 
     if (Number.isNaN(normalizedApplicationFeePercent)) {
@@ -105,15 +123,30 @@ export async function POST(req: Request) {
 
     const parsedNotificationEmails = normalizeNotificationEmails(notificationEmails, normalizedEmail)
 
-    const merchant = {
+    const merchant: Merchant = {
+      ...existingMerchant,
       slug: normalizedSlug,
       name: normalizedName,
       email: normalizedEmail,
       notificationEmails: parsedNotificationEmails,
-      stripeAccountId: normalizedStripeAccountId,
+      status: normalizedStatus,
       applicationFeePercent: normalizedApplicationFeePercent,
       ...(normalizedPostPaymentUrl ? { postPaymentUrl: normalizedPostPaymentUrl } : {}),
       ...(normalizedWhatsapp ? { whatsapp: normalizedWhatsapp } : {}),
+    }
+
+    if (normalizedStripeAccountId) {
+      merchant.stripeAccountId = normalizedStripeAccountId
+    } else {
+      delete merchant.stripeAccountId
+    }
+
+    if (!normalizedPostPaymentUrl) {
+      delete merchant.postPaymentUrl
+    }
+
+    if (!normalizedWhatsapp) {
+      delete merchant.whatsapp
     }
 
     await saveMerchant(merchant)

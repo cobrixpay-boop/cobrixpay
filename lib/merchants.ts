@@ -1,5 +1,15 @@
 import { readMerchantStorage, writeMerchantStorage } from './storage'
 
+export const MERCHANT_STATUSES = [
+  'pending_documents',
+  'under_review',
+  'active',
+  'suspended',
+  'rejected',
+] as const
+
+export type MerchantStatus = (typeof MERCHANT_STATUSES)[number]
+
 export type Merchant = {
   slug: string
   name: string
@@ -8,7 +18,7 @@ export type Merchant = {
   stripeAccountId?: string
   postPaymentUrl?: string
   whatsapp?: string
-  status?: string
+  status: MerchantStatus
   applicationFeePercent?: number
   phone?: string
   websiteOrInstagram?: string
@@ -36,8 +46,9 @@ const defaultMerchants: Record<string, Merchant> = {
   },
 }
 
-type StoredMerchant = Partial<Omit<Merchant, 'notificationEmails'>> & {
+type StoredMerchant = Partial<Omit<Merchant, 'notificationEmails' | 'status'>> & {
   notificationEmails?: unknown
+  status?: unknown
 }
 
 function normalizeSlug(slug: string) {
@@ -52,6 +63,22 @@ function optionalNumber(value: unknown) {
   if (value === undefined || value === null || value === '') return undefined
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : undefined
+}
+
+export function isMerchantStatus(value: unknown): value is MerchantStatus {
+  return typeof value === 'string' && MERCHANT_STATUSES.includes(value as MerchantStatus)
+}
+
+export function normalizeMerchantStatus(value: unknown): MerchantStatus {
+  return isMerchantStatus(value) ? value : 'pending_documents'
+}
+
+export function isValidStripeAccountId(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().startsWith('acct_')
+}
+
+export function canMerchantAcceptPayments(merchant: Merchant | undefined) {
+  return Boolean(merchant && merchant.status === 'active' && isValidStripeAccountId(merchant.stripeAccountId))
 }
 
 function normalizeMerchantRecord(merchant: StoredMerchant, key: string): Merchant {
@@ -73,7 +100,7 @@ function normalizeMerchantRecord(merchant: StoredMerchant, key: string): Merchan
     stripeAccountId: merchant.stripeAccountId,
     postPaymentUrl: optionalString(merchant.postPaymentUrl),
     whatsapp: optionalString(merchant.whatsapp),
-    status: merchant.status || 'pending',
+    status: normalizeMerchantStatus(merchant.status),
     applicationFeePercent: Number(merchant.applicationFeePercent || 0),
     phone: optionalString(merchant.phone),
     websiteOrInstagram: optionalString(merchant.websiteOrInstagram),
@@ -111,7 +138,7 @@ export async function listMerchants() {
   const stored = await readMerchantStorage()
   const loaded: Record<string, Merchant> = Object.fromEntries(
     Object.entries(stored).map(([key, value]) => {
-      const merchant = normalizeMerchantRecord(value, key)
+      const merchant = normalizeMerchantRecord(value as StoredMerchant, key)
       return [merchant.slug, merchant]
     })
   )
@@ -123,4 +150,19 @@ export async function saveMerchant(merchant: Merchant) {
   const merchants = await readMerchantStorage()
   merchants[merchant.slug] = merchant
   await writeMerchantStorage(merchants)
+}
+
+export async function getMerchantStatusReviewReport() {
+  const stored = await readMerchantStorage()
+  return Object.entries(stored).map(([key, merchant]) => {
+    const record = merchant as StoredMerchant
+    const currentStatus = typeof record.status === 'string' && record.status ? record.status : '(sin estado)'
+
+    return {
+      slug: normalizeSlug(record.slug || key),
+      name: record.name || record.slug || key,
+      currentStatus,
+      proposedStatus: isMerchantStatus(record.status) ? record.status : 'requiere decision manual',
+    }
+  })
 }

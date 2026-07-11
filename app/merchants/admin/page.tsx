@@ -2,6 +2,8 @@
 
 import { FormEvent, useEffect, useState } from 'react'
 
+type MerchantStatus = 'pending_documents' | 'under_review' | 'active' | 'suspended' | 'rejected'
+
 type Merchant = {
   slug: string
   name: string
@@ -10,6 +12,7 @@ type Merchant = {
   stripeAccountId?: string
   postPaymentUrl?: string
   whatsapp?: string
+  status: MerchantStatus
   applicationFeePercent?: number
 }
 
@@ -18,6 +21,14 @@ type StorageStatus = {
   usesUpstash?: boolean
   adminAuthRequired?: boolean
 }
+
+const MERCHANT_STATUS_OPTIONS: Array<{ value: MerchantStatus; label: string }> = [
+  { value: 'pending_documents', label: 'Documentacion pendiente' },
+  { value: 'under_review', label: 'En revision' },
+  { value: 'active', label: 'Activo' },
+  { value: 'suspended', label: 'Suspendido' },
+  { value: 'rejected', label: 'Rechazado' },
+]
 
 export default function AdminMerchants() {
   const [merchants, setMerchants] = useState<Record<string, Merchant>>({})
@@ -30,6 +41,7 @@ export default function AdminMerchants() {
   const [email, setEmail] = useState('')
   const [notificationEmails, setNotificationEmails] = useState('')
   const [stripeAccountId, setStripeAccountId] = useState('')
+  const [status, setStatus] = useState<MerchantStatus>('pending_documents')
   const [postPaymentUrl, setPostPaymentUrl] = useState('')
   const [whatsapp, setWhatsapp] = useState('')
   const [applicationFeePercent, setApplicationFeePercent] = useState('0')
@@ -98,6 +110,7 @@ export default function AdminMerchants() {
     setEmail(merchant.email)
     setNotificationEmails(merchant.notificationEmails?.join(', ') || '')
     setStripeAccountId(merchant.stripeAccountId || '')
+    setStatus(merchant.status)
     setPostPaymentUrl(merchant.postPaymentUrl || '')
     setWhatsapp(merchant.whatsapp || '')
     setApplicationFeePercent(String(merchant.applicationFeePercent || 0))
@@ -111,6 +124,7 @@ export default function AdminMerchants() {
     setEmail('')
     setNotificationEmails('')
     setStripeAccountId('')
+    setStatus('pending_documents')
     setPostPaymentUrl('')
     setWhatsapp('')
     setApplicationFeePercent('0')
@@ -120,6 +134,12 @@ export default function AdminMerchants() {
     e.preventDefault()
     setLoading(true)
     setMessage('')
+
+    if (status === 'active' && !hasValidStripeAccountId(stripeAccountId)) {
+      setLoading(false)
+      setMessage('No se puede activar: falta un Stripe Account ID valido.')
+      return
+    }
 
     try {
       const res = await fetch('/api/merchants', {
@@ -131,6 +151,7 @@ export default function AdminMerchants() {
           email,
           notificationEmails,
           stripeAccountId,
+          status,
           postPaymentUrl,
           whatsapp,
           applicationFeePercent,
@@ -145,6 +166,62 @@ export default function AdminMerchants() {
       setMessage(`${editingSlug ? 'Comercio actualizado' : 'Comercio creado'}: /pay/${data.merchant.slug}`)
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'No se pudo crear el comercio'
+      setMessage('Error: ' + errorMessage)
+    }
+
+    setLoading(false)
+  }
+
+  function getStatusLabel(value: MerchantStatus) {
+    return MERCHANT_STATUS_OPTIONS.find((option) => option.value === value)?.label || value
+  }
+
+  function hasValidStripeAccountId(value?: string) {
+    return Boolean(value?.trim().startsWith('acct_'))
+  }
+
+  function getStatusStyle(value: MerchantStatus): React.CSSProperties {
+    const base: React.CSSProperties = {
+      display: 'inline-flex',
+      alignItems: 'center',
+      padding: '4px 8px',
+      borderRadius: 999,
+      fontSize: 12,
+      fontWeight: 800,
+    }
+
+    if (value === 'active') return { ...base, background: '#e8f5e9', color: '#1b5e20' }
+    if (value === 'under_review') return { ...base, background: '#e3f2fd', color: '#0d47a1' }
+    if (value === 'suspended') return { ...base, background: '#fff3e0', color: '#7a4b00' }
+    if (value === 'rejected') return { ...base, background: '#ffebee', color: '#b00020' }
+    return { ...base, background: '#f1f5f9', color: '#475569' }
+  }
+
+  async function updateMerchantStatus(merchant: Merchant, nextStatus: MerchantStatus) {
+    if (nextStatus === 'active' && !hasValidStripeAccountId(merchant.stripeAccountId)) {
+      setMessage('No se puede activar: falta un Stripe Account ID valido.')
+      return
+    }
+
+    setLoading(true)
+    setMessage('')
+
+    try {
+      const res = await fetch('/api/merchants', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAdminHeaders() },
+        body: JSON.stringify({
+          ...merchant,
+          status: nextStatus,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Error')
+
+      setMerchants((current) => ({ ...current, [data.merchant.slug]: data.merchant }))
+      setMessage(`Estado actualizado: ${merchant.slug} -> ${getStatusLabel(nextStatus)}`)
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'No se pudo actualizar el estado'
       setMessage('Error: ' + errorMessage)
     }
 
@@ -242,10 +319,27 @@ export default function AdminMerchants() {
             value={stripeAccountId}
             onChange={(e) => setStripeAccountId(e.target.value.trim())}
             placeholder="acct_..."
-            required
             pattern="acct_.+"
             style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid #ccc' }}
           />
+          <small style={{ color: '#666' }}>Opcional. Es obligatorio solo para activar el comercio.</small>
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>Estado</label>
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value as MerchantStatus)}
+            style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid #ccc', background: '#fff' }}
+          >
+            {MERCHANT_STATUS_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <small style={{ color: '#666' }}>
+            Un comercio solo puede cobrar cuando esta activo y tiene Stripe conectado.
+          </small>
         </div>
         <div style={{ marginBottom: 12 }}>
           <label style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>URL despues del pago</label>
@@ -339,6 +433,18 @@ export default function AdminMerchants() {
             {Object.values(merchants).map((merchant) => (
               <li key={merchant.slug} style={{ marginBottom: 12, padding: 12, background: '#f8f9ff', borderRadius: 10 }}>
                 <strong>{merchant.name}</strong>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+                  <span style={getStatusStyle(merchant.status)}>{getStatusLabel(merchant.status)}</span>
+                  <span
+                    style={{
+                      ...getStatusStyle(hasValidStripeAccountId(merchant.stripeAccountId) ? 'active' : 'pending_documents'),
+                      background: hasValidStripeAccountId(merchant.stripeAccountId) ? '#e8f5e9' : '#fff3e0',
+                      color: hasValidStripeAccountId(merchant.stripeAccountId) ? '#1b5e20' : '#7a4b00',
+                    }}
+                  >
+                    {hasValidStripeAccountId(merchant.stripeAccountId) ? 'Stripe conectado' : 'Stripe pendiente'}
+                  </span>
+                </div>
                 <div>{merchant.email}</div>
                 {merchant.notificationEmails && merchant.notificationEmails.length > 0 && (
                   <div style={{ color: '#555' }}>Notificaciones: {merchant.notificationEmails.join(', ')}</div>
@@ -349,20 +455,69 @@ export default function AdminMerchants() {
                 <div style={{ color: '#555' }}>Comision Cobrix: {merchant.applicationFeePercent || 0}%</div>
                 <div style={{ color: '#555' }}>slug: {merchant.slug}</div>
                 <div style={{ color: '#555' }}>link: {baseUrl}/pay/{merchant.slug}</div>
-                <button
-                  type="button"
-                  onClick={() => fillForm(merchant)}
-                  style={{
-                    marginTop: 8,
-                    padding: '8px 12px',
-                    background: '#fff',
-                    border: '1px solid #ccc',
-                    borderRadius: 8,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Editar
-                </button>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => fillForm(merchant)}
+                    style={{
+                      padding: '8px 12px',
+                      background: '#fff',
+                      border: '1px solid #ccc',
+                      borderRadius: 8,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Editar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updateMerchantStatus(merchant, 'active')}
+                    disabled={loading || !hasValidStripeAccountId(merchant.stripeAccountId)}
+                    title={
+                      hasValidStripeAccountId(merchant.stripeAccountId)
+                        ? 'Activar comercio'
+                        : 'No se puede activar sin Stripe Account ID valido'
+                    }
+                    style={{
+                      padding: '8px 12px',
+                      background: hasValidStripeAccountId(merchant.stripeAccountId) ? '#1b5e20' : '#e5e7eb',
+                      color: hasValidStripeAccountId(merchant.stripeAccountId) ? '#fff' : '#6b7280',
+                      border: '1px solid #ccc',
+                      borderRadius: 8,
+                      cursor: hasValidStripeAccountId(merchant.stripeAccountId) ? 'pointer' : 'not-allowed',
+                    }}
+                  >
+                    Activar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updateMerchantStatus(merchant, 'suspended')}
+                    disabled={loading}
+                    style={{
+                      padding: '8px 12px',
+                      background: '#fff',
+                      border: '1px solid #f3d08a',
+                      borderRadius: 8,
+                      cursor: loading ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    Suspender
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updateMerchantStatus(merchant, 'rejected')}
+                    disabled={loading}
+                    style={{
+                      padding: '8px 12px',
+                      background: '#fff',
+                      border: '1px solid #f0b7c1',
+                      borderRadius: 8,
+                      cursor: loading ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    Rechazar
+                  </button>
+                </div>
               </li>
             ))}
           </ul>

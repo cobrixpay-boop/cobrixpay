@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { DashboardActions } from './dashboard-actions'
 import { getMerchantFromSession, MERCHANT_SESSION_COOKIE } from '@/lib/merchant-session'
+import { canMerchantAcceptPayments, type MerchantStatus } from '@/lib/merchants'
 import { getSiteUrl } from '@/lib/site-url'
 
 type MerchantDashboardPageProps = {
@@ -170,6 +171,14 @@ function getStripeErrorMessage(error?: string) {
   return ''
 }
 
+function translateMerchantStatus(status: MerchantStatus) {
+  if (status === 'pending_documents') return 'Documentacion pendiente'
+  if (status === 'under_review') return 'En revision'
+  if (status === 'active') return 'Activo'
+  if (status === 'suspended') return 'Suspendido'
+  return 'Rechazado'
+}
+
 export default async function MerchantDashboardPage({ searchParams }: MerchantDashboardPageProps) {
   const params = await searchParams
   const stripeErrorMessage = getStripeErrorMessage(params?.stripe_error)
@@ -182,6 +191,7 @@ export default async function MerchantDashboardPage({ searchParams }: MerchantDa
 
   const paymentLink = getPaymentLink(merchant.slug)
   const hasStripeAccount = Boolean(merchant.stripeAccountId)
+  const canAcceptPayments = canMerchantAcceptPayments(merchant)
   const monthlyData = await getMonthlyDashboardData(merchant.slug, merchant.stripeAccountId)
   const monthlySummary = monthlyData.summary
 
@@ -273,7 +283,13 @@ export default async function MerchantDashboardPage({ searchParams }: MerchantDa
               </div>
               <p style={sectionDescriptionStyle}>Us&aacute; tu QR permanente o compart&iacute; el enlace de pago del comercio.</p>
             </div>
-            <DashboardActions merchantName={merchant.name} paymentLink={paymentLink} />
+            {!canAcceptPayments && (
+              <p style={accountNoticeStyle}>
+                Tu cuenta figura como {translateMerchantStatus(merchant.status)}. El enlace de pago se habilitara cuando
+                Cobrix Pay complete la revision y active el comercio.
+              </p>
+            )}
+            {canAcceptPayments && <DashboardActions merchantName={merchant.name} paymentLink={paymentLink} />}
           </section>
 
           <section style={sectionStyle}>

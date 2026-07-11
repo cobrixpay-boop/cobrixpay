@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 const fs = require('fs')
 const path = require('path')
 
@@ -79,11 +80,6 @@ function main() {
     process.exit(1)
   }
 
-  if (!stripeAccountId) {
-    console.error('Error: falta el Stripe Account ID. Usa --stripeAccountId acct_...')
-    process.exit(1)
-  }
-
   const merchantsPath = path.join(process.cwd(), 'data', 'merchants.json')
   const merchants = readMerchants(merchantsPath)
 
@@ -100,8 +96,17 @@ function main() {
     name,
     email,
     notificationEmails: parsedNotificationEmails,
-    stripeAccountId: stripeAccountId.trim(),
+    status: 'pending_documents',
     applicationFeePercent: parsedApplicationFeePercent,
+  }
+
+  if (stripeAccountId) {
+    const normalizedStripeAccountId = stripeAccountId.trim()
+    if (!normalizedStripeAccountId.startsWith('acct_')) {
+      console.error('Error: el Stripe Account ID debe empezar con acct_')
+      process.exit(1)
+    }
+    merchants[slug].stripeAccountId = normalizedStripeAccountId
   }
 
   writeMerchants(merchantsPath, merchants)

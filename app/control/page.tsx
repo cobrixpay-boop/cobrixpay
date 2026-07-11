@@ -177,7 +177,7 @@ export default async function ControlPage() {
   const { metrics, hasStripeData } = await collectStripeMetrics(merchants)
   const rows: MerchantRow[] = merchants.map((merchant) => ({ ...merchant, ...(metrics.get(merchant.slug) || emptyMetrics()) }))
 
-  const activeMerchants = rows.filter((merchant) => merchant.status === 'active' || merchant.stripeAccountId).length
+  const activeMerchants = rows.filter((merchant) => merchant.status === 'active').length
   const monthVolume = rows.reduce((total, merchant) => total + merchant.monthVolume, 0)
   const monthNet = rows.reduce((total, merchant) => total + merchant.monthNet, 0)
   const previousVolume = rows.reduce((total, merchant) => total + merchant.previousVolume, 0)
