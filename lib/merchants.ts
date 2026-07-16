@@ -10,6 +10,68 @@ export const MERCHANT_STATUSES = [
 
 export type MerchantStatus = (typeof MERCHANT_STATUSES)[number]
 
+export type MerchantOnboardingInvitation = {
+  id: string
+  tokenHash: string
+  createdAt: string
+  expiresAt: string
+  sentAt?: string
+  resentAt?: string
+  revokedAt?: string
+  createdBy?: string
+  email: string
+}
+
+export type MerchantOnboardingProgress = {
+  percent: number
+  lastCompletedStep: number
+  startedAt?: string
+  lastSavedAt?: string
+  submittedAt?: string
+  documentationPending: boolean
+}
+
+export type MerchantOnboarding = {
+  invitation?: MerchantOnboardingInvitation
+  responsiblePerson?: Record<string, string | boolean>
+  businessProfile?: Record<string, string | boolean>
+  operations?: Record<string, string | boolean | string[]>
+  banking?: Record<string, string>
+  declarations?: {
+    accepted: Record<string, { acceptedAt: string; version: string }>
+    submittedBy?: string
+    submittedIp?: string
+    submittedUserAgent?: string
+    invitationId?: string
+  }
+  progress: MerchantOnboardingProgress
+  timestamps: {
+    createdAt?: string
+    startedAt?: string
+    lastSavedAt?: string
+    submittedAt?: string
+  }
+}
+
+export type MerchantCompliance = {
+  documentationPending?: boolean
+  alerts?: Array<{
+    code: string
+    message: string
+    createdAt: string
+  }>
+  documents?: {
+    pending: string[]
+  }
+}
+
+export type MerchantAuditEvent = {
+  type: string
+  createdAt: string
+  actor?: string
+  detail?: string
+}
+
 export type Merchant = {
   slug: string
   name: string
@@ -22,6 +84,9 @@ export type Merchant = {
   archived: boolean
   archivedReason?: 'admin' | 'compliance'
   everActive?: boolean
+  onboarding?: MerchantOnboarding
+  compliance?: MerchantCompliance
+  auditHistory?: MerchantAuditEvent[]
   applicationFeePercent?: number
   phone?: string
   websiteOrInstagram?: string
@@ -70,6 +135,26 @@ function optionalNumber(value: unknown) {
   return Number.isFinite(parsed) ? parsed : undefined
 }
 
+function optionalRecord(value: unknown): Record<string, unknown> | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  return value as Record<string, unknown>
+}
+
+function optionalAuditHistory(value: unknown): MerchantAuditEvent[] | undefined {
+  if (!Array.isArray(value)) return undefined
+
+  return value
+    .filter((event) => event && typeof event === 'object')
+    .map((event) => event as Partial<MerchantAuditEvent>)
+    .filter((event) => typeof event.type === 'string' && typeof event.createdAt === 'string')
+    .map((event) => ({
+      type: event.type || '',
+      createdAt: event.createdAt || '',
+      actor: optionalString(event.actor),
+      detail: optionalString(event.detail),
+    }))
+}
+
 export function isMerchantStatus(value: unknown): value is MerchantStatus {
   return typeof value === 'string' && MERCHANT_STATUSES.includes(value as MerchantStatus)
 }
@@ -115,6 +200,9 @@ function normalizeMerchantRecord(merchant: StoredMerchant, key: string): Merchan
     archivedReason:
       merchant.archivedReason === 'compliance' ? 'compliance' : merchant.archivedReason === 'admin' ? 'admin' : undefined,
     everActive: merchant.everActive === true || merchant.status === 'active',
+    onboarding: optionalRecord(merchant.onboarding) as MerchantOnboarding | undefined,
+    compliance: optionalRecord(merchant.compliance) as MerchantCompliance | undefined,
+    auditHistory: optionalAuditHistory(merchant.auditHistory),
     applicationFeePercent: Number(merchant.applicationFeePercent || 0),
     phone: optionalString(merchant.phone),
     websiteOrInstagram: optionalString(merchant.websiteOrInstagram),

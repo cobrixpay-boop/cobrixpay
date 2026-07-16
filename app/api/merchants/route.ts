@@ -66,6 +66,30 @@ function isValidPostPaymentUrl(value: string) {
   }
 }
 
+function sanitizeMerchantForAdmin(merchant: Merchant) {
+  const invitation = merchant.onboarding?.invitation
+  return {
+    ...merchant,
+    onboarding: merchant.onboarding
+      ? {
+          ...merchant.onboarding,
+          invitation: invitation
+            ? {
+                id: invitation.id,
+                createdAt: invitation.createdAt,
+                expiresAt: invitation.expiresAt,
+                sentAt: invitation.sentAt,
+                resentAt: invitation.resentAt,
+                revokedAt: invitation.revokedAt,
+                createdBy: invitation.createdBy,
+                email: invitation.email,
+              }
+            : undefined,
+        }
+      : undefined,
+  }
+}
+
 function normalizeOptionalBoolean(value: unknown, fallback: boolean) {
   if (typeof value === 'boolean') return value
   return fallback
@@ -143,7 +167,9 @@ export async function GET(req: Request) {
     }
 
     const merchants = await listMerchants()
-    return NextResponse.json(merchants)
+    return NextResponse.json(
+      Object.fromEntries(Object.entries(merchants).map(([slug, merchant]) => [slug, sanitizeMerchantForAdmin(merchant)]))
+    )
   } catch {
     return NextResponse.json({ error: 'No se pudo leer merchants' }, { status: 500 })
   }
@@ -242,7 +268,7 @@ export async function POST(req: Request) {
 
     await saveMerchant(merchant)
 
-    return NextResponse.json({ ok: true, merchant })
+    return NextResponse.json({ ok: true, merchant: sanitizeMerchantForAdmin(merchant) })
   } catch (err: unknown) {
     return NextResponse.json({ error: getErrorMessage(err) || 'Error interno' }, { status: 500 })
   }

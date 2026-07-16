@@ -16,6 +16,42 @@ type Merchant = {
   archived: boolean
   archivedReason?: 'admin' | 'compliance'
   everActive?: boolean
+  onboarding?: {
+    invitation?: {
+      id: string
+      createdAt: string
+      expiresAt: string
+      sentAt?: string
+      resentAt?: string
+      revokedAt?: string
+      email: string
+    }
+    responsiblePerson?: Record<string, string | boolean>
+    businessProfile?: Record<string, string | boolean>
+    operations?: Record<string, string | boolean | string[]>
+    banking?: Record<string, string>
+    declarations?: {
+      accepted: Record<string, { acceptedAt: string; version: string }>
+      submittedBy?: string
+      submittedIp?: string
+      submittedUserAgent?: string
+      invitationId?: string
+    }
+    progress?: {
+      percent: number
+      lastCompletedStep: number
+      startedAt?: string
+      lastSavedAt?: string
+      submittedAt?: string
+      documentationPending: boolean
+    }
+  }
+  compliance?: {
+    documentationPending?: boolean
+    alerts?: Array<{ code: string; message: string; createdAt: string }>
+    documents?: { pending: string[] }
+  }
+  auditHistory?: Array<{ type: string; createdAt: string; actor?: string; detail?: string }>
   applicationFeePercent?: number
 }
 
@@ -65,6 +101,15 @@ export default function AdminMerchants() {
   const [baseUrl] = useState(() => (typeof window === 'undefined' ? '' : window.location.origin))
   const [editingSlug, setEditingSlug] = useState('')
   const [filter, setFilter] = useState<MerchantFilter>('all')
+  const [inviteName, setInviteName] = useState('')
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteWhatsapp, setInviteWhatsapp] = useState('')
+  const [inviteSlug, setInviteSlug] = useState('')
+  const [inviteFee, setInviteFee] = useState('0')
+  const [inviteSalesRep, setInviteSalesRep] = useState('')
+  const [inviteSource, setInviteSource] = useState('')
+  const [lastInvitationLinks, setLastInvitationLinks] = useState<Record<string, string>>({})
+  const [selectedRegistrationSlug, setSelectedRegistrationSlug] = useState('')
 
   function getAdminHeaders(): Record<string, string> {
     return adminToken ? { 'x-admin-token': adminToken } : {}
@@ -332,51 +377,211 @@ export default function AdminMerchants() {
     setLoading(false)
   }
 
+  async function createInvitation(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    setLoading(true)
+    setMessage('')
+
+    try {
+      const res = await fetch('/api/merchant-invitations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAdminHeaders() },
+        body: JSON.stringify({
+          action: 'create',
+          name: inviteName,
+          email: inviteEmail,
+          whatsapp: inviteWhatsapp,
+          slug: inviteSlug,
+          applicationFeePercent: inviteFee,
+          salesRepName: inviteSalesRep,
+          source: inviteSource,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'No se pudo crear la invitacion')
+
+      setMerchants((current) => ({ ...current, [data.merchant.slug]: data.merchant }))
+      if (data.invitationLink) {
+        setLastInvitationLinks((current) => ({ ...current, [data.merchant.slug]: data.invitationLink }))
+        await navigator.clipboard.writeText(data.invitationLink).catch(() => undefined)
+      }
+      setInviteName('')
+      setInviteEmail('')
+      setInviteWhatsapp('')
+      setInviteSlug('')
+      setInviteFee('0')
+      setInviteSalesRep('')
+      setInviteSource('')
+      setMessage(
+        data.emailSent
+          ? `Invitacion enviada y enlace copiado: ${data.merchant.slug}`
+          : `Invitacion generada y enlace copiado: ${data.merchant.slug}. Email no enviado porque falta RESEND_API_KEY.`
+      )
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'No se pudo crear la invitacion'
+      setMessage('Error: ' + errorMessage)
+    }
+
+    setLoading(false)
+  }
+
+  async function updateInvitation(merchant: Merchant, action: 'resend' | 'revoke' | 'regenerate') {
+    setLoading(true)
+    setMessage('')
+
+    try {
+      const res = await fetch('/api/merchant-invitations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAdminHeaders() },
+        body: JSON.stringify({ action, slug: merchant.slug }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'No se pudo actualizar la invitacion')
+
+      setMerchants((current) => ({ ...current, [data.merchant.slug]: data.merchant }))
+      if (data.invitationLink) {
+        setLastInvitationLinks((current) => ({ ...current, [data.merchant.slug]: data.invitationLink }))
+        await navigator.clipboard.writeText(data.invitationLink).catch(() => undefined)
+      }
+      setMessage(
+        action === 'revoke'
+          ? `Invitacion revocada: ${merchant.slug}`
+          : data.emailSent
+          ? `Invitacion enviada y enlace copiado: ${merchant.slug}`
+          : `Enlace generado y copiado: ${merchant.slug}. Email no enviado porque falta RESEND_API_KEY.`
+      )
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'No se pudo actualizar la invitacion'
+      setMessage('Error: ' + errorMessage)
+    }
+
+    setLoading(false)
+  }
+
+  async function copyInvitationLink(merchant: Merchant) {
+    const link = lastInvitationLinks[merchant.slug]
+    if (!link) {
+      setMessage('Genera un nuevo enlace para copiarlo. Por seguridad no guardamos el token completo.')
+      return
+    }
+
+    await navigator.clipboard.writeText(link)
+    setMessage(`Enlace copiado: ${merchant.slug}`)
+  }
+
+  function formatDate(value?: string) {
+    if (!value) return 'Pendiente'
+    return new Intl.DateTimeFormat('es-AR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value))
+  }
+
+  function readText(record: Record<string, string | boolean | string[]> | undefined, key: string) {
+    const value = record?.[key]
+    if (Array.isArray(value)) return value.join(', ')
+    if (typeof value === 'boolean') return value ? 'Si' : 'No'
+    return value || ''
+  }
+
   const visibleMerchants = getVisibleMerchants()
+  const selectedRegistration = selectedRegistrationSlug ? merchants[selectedRegistrationSlug] : undefined
 
   return (
     <div style={{ padding: '2rem 1rem', maxWidth: 760, margin: '0 auto' }}>
       <h1>Administrar Comercios</h1>
 
-      <form onSubmit={handleCreate} style={{ marginTop: 16 }}>
-        {storageStatus && (
-          <div
+      {storageStatus && (
+        <div
+          style={{
+            marginTop: 16,
+            padding: 12,
+            borderRadius: 8,
+            background: storageStatus.usesUpstash ? '#e8f5e9' : '#fff3e0',
+            border: storageStatus.usesUpstash ? '1px solid #4caf50' : '1px solid #ff9800',
+          }}
+        >
+          <strong>Modo de persistencia:</strong>{' '}
+          {storageStatus.storage === 'upstash' ? 'Upstash Redis' : 'Archivo local'}
+          <div style={{ marginTop: 4, color: '#333', fontSize: '0.9em' }}>
+            {storageStatus.usesUpstash && 'Los comercios se guardaran en Upstash Redis. Funciona en produccion.'}
+            {!storageStatus.usesUpstash && (
+              <>
+                Los comercios se guardan localmente en <code>data/merchants.json</code>.
+                <br />
+                <strong>Para produccion:</strong> configura Upstash Redis en Vercel.
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {storageStatus?.adminAuthRequired && (
+        <div style={{ marginTop: 12 }}>
+          <label style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>Token de administrador</label>
+          <input
+            value={adminToken}
+            onChange={(e) => handleTokenChange(e.target.value)}
+            type="password"
+            placeholder="ADMIN_TOKEN"
+            style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid #ccc' }}
+          />
+        </div>
+      )}
+
+      <section style={{ marginTop: 16, padding: 16, border: '1px solid #dfe4ee', borderRadius: 8, background: '#fff' }}>
+        <h2 style={{ marginTop: 0 }}>Invitar comercio</h2>
+        <form onSubmit={createInvitation}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+            <label>
+              <span style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>Nombre comercial preliminar</span>
+              <input value={inviteName} onChange={(e) => setInviteName(e.target.value)} required style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid #ccc' }} />
+            </label>
+            <label>
+              <span style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>Email</span>
+              <input value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} type="email" required style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid #ccc' }} />
+            </label>
+            <label>
+              <span style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>Telefono o WhatsApp</span>
+              <input value={inviteWhatsapp} onChange={(e) => setInviteWhatsapp(e.target.value)} required style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid #ccc' }} />
+            </label>
+            <label>
+              <span style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>Slug</span>
+              <input value={inviteSlug} onChange={(e) => setInviteSlug(normalizeSlug(e.target.value))} required style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid #ccc' }} />
+            </label>
+            <label>
+              <span style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>Comision Cobrix (%)</span>
+              <input value={inviteFee} onChange={(e) => setInviteFee(e.target.value)} type="number" min="0" max="100" step="0.01" required style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid #ccc' }} />
+            </label>
+            <label>
+              <span style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>Vendedor responsable</span>
+              <input value={inviteSalesRep} onChange={(e) => setInviteSalesRep(e.target.value)} style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid #ccc' }} />
+            </label>
+            <label>
+              <span style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>Canal interno</span>
+              <input value={inviteSource} onChange={(e) => setInviteSource(e.target.value)} style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid #ccc' }} />
+            </label>
+          </div>
+          <button
+            type="submit"
+            disabled={loading}
             style={{
-              marginBottom: 16,
-              padding: 12,
+              marginTop: 12,
+              padding: '12px 20px',
+              background: '#1455d9',
+              color: '#fff',
+              border: 'none',
               borderRadius: 8,
-              background: storageStatus.usesUpstash ? '#e8f5e9' : '#fff3e0',
-              border: storageStatus.usesUpstash ? '1px solid #4caf50' : '1px solid #ff9800',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              fontWeight: 700,
             }}
           >
-            <strong>Modo de persistencia:</strong>{' '}
-            {storageStatus.storage === 'upstash' ? 'Upstash Redis' : 'Archivo local'}
-            <div style={{ marginTop: 4, color: '#333', fontSize: '0.9em' }}>
-              {storageStatus.usesUpstash && 'Los comercios se guardaran en Upstash Redis. Funciona en produccion.'}
-              {!storageStatus.usesUpstash && (
-                <>
-                  Los comercios se guardan localmente en <code>data/merchants.json</code>.
-                  <br />
-                  <strong>Para produccion:</strong> configura Upstash Redis en Vercel.
-                </>
-              )}
-            </div>
-          </div>
-        )}
+            {loading ? 'Enviando...' : 'Invitar comercio'}
+          </button>
+        </form>
+      </section>
+      {message && <p style={{ marginTop: 12, color: message.startsWith('Error') ? '#b00020' : '#1b5e20' }}>{message}</p>}
 
-        {storageStatus?.adminAuthRequired && (
-          <div style={{ marginBottom: 12 }}>
-            <label style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>Token de administrador</label>
-            <input
-              value={adminToken}
-              onChange={(e) => handleTokenChange(e.target.value)}
-              type="password"
-              placeholder="ADMIN_TOKEN"
-              style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid #ccc' }}
-            />
-          </div>
-        )}
-
+      {editingSlug && (
+      <form onSubmit={handleCreate} style={{ marginTop: 16, padding: 16, border: '1px solid #dfe4ee', borderRadius: 8, background: '#fff' }}>
+        <h2 style={{ marginTop: 0 }}>Editar comercio</h2>
         <div style={{ marginBottom: 12 }}>
           <label style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>Slug</label>
           <input
@@ -514,8 +719,8 @@ export default function AdminMerchants() {
             Cancelar edicion
           </button>
         )}
-        {message && <p style={{ marginTop: 12, color: message.startsWith('Error') ? '#b00020' : '#1b5e20' }}>{message}</p>}
       </form>
+      )}
 
       <section style={{ marginTop: 32 }}>
         <h2>Comercios existentes</h2>
@@ -596,6 +801,26 @@ export default function AdminMerchants() {
                 <div style={{ color: '#555' }}>Comision Cobrix: {merchant.applicationFeePercent || 0}%</div>
                 <div style={{ color: '#555' }}>slug: {merchant.slug}</div>
                 <div style={{ color: '#555' }}>link: {baseUrl}/pay/{merchant.slug}</div>
+                <div style={{ marginTop: 8, padding: 10, border: '1px solid #e2e5ee', borderRadius: 8, background: '#fff' }}>
+                  <strong>Registro:</strong> {merchant.onboarding?.progress?.percent || 0}% completado
+                  <div style={{ color: merchant.onboarding?.invitation?.revokedAt ? '#b00020' : '#555' }}>
+                    Invitacion:{' '}
+                    {merchant.onboarding?.invitation?.revokedAt
+                      ? `Revocada (${formatDate(merchant.onboarding.invitation.revokedAt)})`
+                      : merchant.onboarding?.invitation
+                      ? 'Activa'
+                      : 'Sin invitacion'}
+                  </div>
+                  <div style={{ color: '#555' }}>Invitacion enviada: {formatDate(merchant.onboarding?.invitation?.sentAt)}</div>
+                  <div style={{ color: '#555' }}>Creada: {formatDate(merchant.onboarding?.invitation?.createdAt)}</div>
+                  <div style={{ color: '#555' }}>Vence: {formatDate(merchant.onboarding?.invitation?.expiresAt)}</div>
+                  <div style={{ color: '#555' }}>Registro iniciado: {formatDate(merchant.onboarding?.progress?.startedAt)}</div>
+                  <div style={{ color: '#555' }}>Ultima actualizacion: {formatDate(merchant.onboarding?.progress?.lastSavedAt)}</div>
+                  <div style={{ color: '#555' }}>Registro enviado: {formatDate(merchant.onboarding?.progress?.submittedAt)}</div>
+                  <div style={{ color: merchant.compliance?.documentationPending ? '#7a4b00' : '#555' }}>
+                    Documentacion: {merchant.compliance?.documentationPending ? 'Pendiente' : 'Sin pendientes registrados'}
+                  </div>
+                </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
                   <button
                     type="button"
@@ -656,7 +881,10 @@ export default function AdminMerchants() {
                       background: '#fff',
                       border: '1px solid #f0b7c1',
                       borderRadius: 8,
-                      cursor: loading ? 'not-allowed' : 'pointer',
+                      cursor:
+                        loading || !merchant.onboarding?.invitation || Boolean(merchant.onboarding.invitation.revokedAt)
+                          ? 'not-allowed'
+                          : 'pointer',
                     }}
                   >
                     Rechazar
@@ -710,12 +938,175 @@ export default function AdminMerchants() {
                       Eliminar definitivamente
                     </button>
                   )}
+                  <button
+                    type="button"
+                    onClick={() => copyInvitationLink(merchant)}
+                    disabled={loading || !lastInvitationLinks[merchant.slug]}
+                    title={
+                      lastInvitationLinks[merchant.slug]
+                        ? 'Copiar el ultimo enlace generado'
+                        : 'Genera o regenera un enlace para copiarlo'
+                    }
+                    style={{
+                      padding: '8px 12px',
+                      background: '#fff',
+                      border: '1px solid #cfd4e2',
+                      borderRadius: 8,
+                      cursor: loading || !lastInvitationLinks[merchant.slug] ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    Copiar enlace
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updateInvitation(merchant, 'resend')}
+                    disabled={loading || !merchant.onboarding?.invitation || Boolean(merchant.onboarding.invitation.revokedAt)}
+                    style={{
+                      padding: '8px 12px',
+                      background: '#fff',
+                      border: '1px solid #cfd4e2',
+                      borderRadius: 8,
+                      cursor:
+                        loading || !merchant.onboarding?.invitation || Boolean(merchant.onboarding.invitation.revokedAt)
+                          ? 'not-allowed'
+                          : 'pointer',
+                    }}
+                  >
+                    Reenviar invitacion
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updateInvitation(merchant, 'revoke')}
+                    disabled={loading || !merchant.onboarding?.invitation || Boolean(merchant.onboarding.invitation.revokedAt)}
+                    style={{
+                      padding: '8px 12px',
+                      background: '#fff',
+                      border: '1px solid #f0b7c1',
+                      borderRadius: 8,
+                      cursor: loading ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    Revocar invitacion
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updateInvitation(merchant, 'regenerate')}
+                    disabled={loading}
+                    style={{
+                      padding: '8px 12px',
+                      background: '#fff',
+                      border: '1px solid #94a3b8',
+                      borderRadius: 8,
+                      cursor: loading ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    Regenerar enlace
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRegistrationSlug(selectedRegistrationSlug === merchant.slug ? '' : merchant.slug)}
+                    style={{
+                      padding: '8px 12px',
+                      background: '#fff',
+                      border: '1px solid #1455d9',
+                      borderRadius: 8,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Ver registro
+                  </button>
                 </div>
+                {selectedRegistration?.slug === merchant.slug && (
+                  <div style={{ marginTop: 12, padding: 12, border: '1px solid #dfe4ee', borderRadius: 8, background: '#fff' }}>
+                    <h3 style={{ marginTop: 0 }}>Registro del comercio</h3>
+                    <RegistrationBlock
+                      title="Responsable"
+                      rows={[
+                        ['Nombre', `${readText(merchant.onboarding?.responsiblePerson, 'firstName')} ${readText(merchant.onboarding?.responsiblePerson, 'lastName')}`],
+                        ['Documento', `${readText(merchant.onboarding?.responsiblePerson, 'documentType')} ${readText(merchant.onboarding?.responsiblePerson, 'documentNumber')}`],
+                        ['CUIT/CUIL', readText(merchant.onboarding?.responsiblePerson, 'taxId')],
+                        ['Email', readText(merchant.onboarding?.responsiblePerson, 'email')],
+                        ['Relacion', readText(merchant.onboarding?.responsiblePerson, 'relationship')],
+                      ]}
+                    />
+                    <RegistrationBlock
+                      title="Comercio"
+                      rows={[
+                        ['Nombre comercial', readText(merchant.onboarding?.businessProfile, 'tradeName')],
+                        ['Razon social', readText(merchant.onboarding?.businessProfile, 'legalName')],
+                        ['CUIT', readText(merchant.onboarding?.businessProfile, 'businessTaxId')],
+                        ['Rubro', readText(merchant.onboarding?.businessProfile, 'mainCategory')],
+                        ['Como conocio Cobrix Pay', readText(merchant.onboarding?.businessProfile, 'knownBy')],
+                      ]}
+                    />
+                    <RegistrationBlock
+                      title="Operacion"
+                      rows={[
+                        ['Servicios', readText(merchant.onboarding?.operations, 'soldProducts')],
+                        ['Ticket promedio', readText(merchant.onboarding?.operations, 'averageTicketUsd')],
+                        ['Ticket maximo', readText(merchant.onboarding?.operations, 'maxTicketUsd')],
+                        ['Volumen mensual', readText(merchant.onboarding?.operations, 'monthlyVolumeUsd')],
+                        ['Canales', readText(merchant.onboarding?.operations, 'salesChannels')],
+                      ]}
+                    />
+                    <RegistrationBlock
+                      title="Banco"
+                      rows={[
+                        ['Banco', readText(merchant.onboarding?.banking, 'bank')],
+                        ['Tipo de cuenta', readText(merchant.onboarding?.banking, 'accountType')],
+                        ['Moneda', readText(merchant.onboarding?.banking, 'currency')],
+                        ['Titular', readText(merchant.onboarding?.banking, 'holderName')],
+                        ['CUIT titular', readText(merchant.onboarding?.banking, 'holderTaxId')],
+                      ]}
+                    />
+                    <RegistrationBlock
+                      title="Declaraciones"
+                      rows={[
+                        ['Enviado por', merchant.onboarding?.declarations?.submittedBy || 'Pendiente'],
+                        ['Fecha de envio', formatDate(merchant.onboarding?.progress?.submittedAt)],
+                        ['Version', Object.values(merchant.onboarding?.declarations?.accepted || {})[0]?.version || 'Pendiente'],
+                        ['User agent', merchant.onboarding?.declarations?.submittedUserAgent || 'Pendiente'],
+                      ]}
+                    />
+                    {(merchant.compliance?.alerts || []).length > 0 && (
+                      <div>
+                        <h4>Alertas internas</h4>
+                        <ul>{merchant.compliance?.alerts?.map((alert) => <li key={alert.code}>{alert.message}</li>)}</ul>
+                      </div>
+                    )}
+                    <div>
+                      <h4>Documentacion pendiente</h4>
+                      <ul>{(merchant.compliance?.documents?.pending || ['Pendiente de definir']).map((item) => <li key={item}>{item}</li>)}</ul>
+                    </div>
+                  </div>
+                )}
               </li>
             ))}
           </ul>
         </div>
       </section>
     </div>
+  )
+}
+
+function RegistrationBlock({ title, rows }: { title: string; rows: Array<[string, string]> }) {
+  return (
+    <section style={{ marginTop: 12 }}>
+      <h4 style={{ margin: '0 0 6px' }}>{title}</h4>
+      <dl style={{ display: 'grid', gridTemplateColumns: 'minmax(120px, 180px) 1fr', gap: '6px 12px', margin: 0 }}>
+        {rows.map(([label, value]) => (
+          <FragmentRow key={`${title}-${label}`} label={label} value={value || 'Pendiente'} />
+        ))}
+      </dl>
+    </section>
+  )
+}
+
+function FragmentRow({ label, value }: { label: string; value: string }) {
+  return (
+    <>
+      <dt style={{ color: '#5b6275', fontWeight: 700 }}>{label}</dt>
+      <dd style={{ margin: 0 }}>{value}</dd>
+    </>
   )
 }
