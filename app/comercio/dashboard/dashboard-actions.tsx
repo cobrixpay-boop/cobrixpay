@@ -214,10 +214,10 @@ export function DashboardActions({ merchantName, paymentLink }: DashboardActions
 
   return (
     <section style={qrSectionStyle}>
-      <h2 style={{ margin: 0, fontSize: 24, lineHeight: 1.2 }}>Mi QR permanente</h2>
+      <h3 style={{ margin: 0, fontSize: 20, lineHeight: 1.2 }}>QR permanente</h3>
 
       <div style={qrWrapperStyle}>
-        <QRCodeCanvas value={paymentLink} size={260} marginSize={2} level="H" />
+        <QRCodeCanvas value={paymentLink} size={210} marginSize={2} level="H" />
       </div>
 
       <div style={paymentLinkBlockStyle}>
@@ -248,15 +248,15 @@ const qrSectionStyle = {
 
 const qrWrapperStyle = {
   display: 'inline-flex',
-  marginTop: 18,
-  padding: 14,
+  marginTop: 14,
+  padding: 12,
   border: '1px solid #e2e5ee',
   borderRadius: 8,
   background: '#fff',
 } satisfies React.CSSProperties
 
 const paymentLinkBlockStyle = {
-  margin: '16px auto 0',
+  margin: '12px auto 0',
   maxWidth: 620,
 } satisfies React.CSSProperties
 
@@ -276,6 +276,7 @@ const paymentLinkStyle = {
 } satisfies React.CSSProperties
 
 const primaryButtonStyle = {
+  minHeight: 44,
   padding: '11px 16px',
   border: '1px solid #635bff',
   borderRadius: 8,
@@ -286,6 +287,7 @@ const primaryButtonStyle = {
 } satisfies React.CSSProperties
 
 const secondaryButtonStyle = {
+  minHeight: 44,
   padding: '10px 14px',
   border: '1px solid #cfd4e2',
   borderRadius: 8,

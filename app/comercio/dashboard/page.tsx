@@ -1,9 +1,17 @@
-import Stripe from 'stripe'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { DashboardActions } from './dashboard-actions'
+import { MonthlyReportActions } from './monthly-report-actions'
 import { getMerchantFromSession, MERCHANT_SESSION_COOKIE } from '@/lib/merchant-session'
 import { canMerchantAcceptPayments, type MerchantStatus } from '@/lib/merchants'
+import {
+  getCurrentMonthKey,
+  getMonthlyDashboardData,
+  getNextMerchantPayout,
+  type MerchantMonthlySummary,
+  type NextPayoutResult,
+} from '@/lib/merchant-stripe-data'
+import { formatStripeMoney } from '@/lib/stripe-money'
 import { getSiteUrl } from '@/lib/site-url'
 
 type MerchantDashboardPageProps = {
@@ -12,125 +20,8 @@ type MerchantDashboardPageProps = {
   }>
 }
 
-type MonthlySummary = {
-  totalProcessed: number
-  paymentCount: number
-  averageTicket: number
-}
-
-type MonthlyPayment = {
-  id: string
-  created: number
-  amount: number
-  status: string
-}
-
-type MonthlyDashboardData = {
-  summary: MonthlySummary
-  payments: MonthlyPayment[]
-}
-
 function getPaymentLink(slug: string) {
   return `${getSiteUrl()}/pay/${slug}`
-}
-
-function getStripe() {
-  const secretKey = process.env.STRIPE_SECRET_KEY
-
-  if (!secretKey) return null
-
-  return new Stripe(secretKey, {
-    apiVersion: '2026-02-25.clover',
-  })
-}
-
-function getCurrentMonthRange() {
-  const now = new Date()
-  const start = new Date(now.getFullYear(), now.getMonth(), 1)
-
-  return {
-    startTimestamp: Math.floor(start.getTime() / 1000),
-    endTimestamp: Math.floor(now.getTime() / 1000),
-  }
-}
-
-function getPaymentStatus(paymentIntent: Stripe.PaymentIntent) {
-  const latestCharge =
-    typeof paymentIntent.latest_charge === 'object' && paymentIntent.latest_charge ? paymentIntent.latest_charge : null
-
-  if (latestCharge?.refunded || (latestCharge?.amount_refunded || 0) > 0) {
-    return 'refunded'
-  }
-
-  return paymentIntent.status
-}
-
-async function getMonthlyDashboardData(merchantSlug: string, stripeAccountId?: string): Promise<MonthlyDashboardData> {
-  const stripe = getStripe()
-
-  if (!stripe || !stripeAccountId) {
-    return {
-      summary: { totalProcessed: 0, paymentCount: 0, averageTicket: 0 },
-      payments: [],
-    }
-  }
-
-  const { startTimestamp, endTimestamp } = getCurrentMonthRange()
-  let totalProcessed = 0
-  let paymentCount = 0
-  const payments: MonthlyPayment[] = []
-
-  try {
-    const paymentIntents = stripe.paymentIntents.list({
-      created: {
-        gte: startTimestamp,
-        lte: endTimestamp,
-      },
-      expand: ['data.latest_charge'],
-      limit: 100,
-    })
-
-    for await (const paymentIntent of paymentIntents) {
-      const belongsToMerchant =
-        paymentIntent.metadata?.merchantSlug === merchantSlug &&
-        paymentIntent.transfer_data?.destination === stripeAccountId
-
-      if (paymentIntent.status === 'succeeded' && belongsToMerchant) {
-        totalProcessed += paymentIntent.amount_received || paymentIntent.amount
-        paymentCount += 1
-      }
-
-      if (belongsToMerchant && payments.length < 20) {
-        payments.push({
-          id: paymentIntent.id,
-          created: paymentIntent.created,
-          amount: paymentIntent.amount_received || paymentIntent.amount,
-          status: getPaymentStatus(paymentIntent),
-        })
-      }
-    }
-  } catch {
-    return {
-      summary: { totalProcessed: 0, paymentCount: 0, averageTicket: 0 },
-      payments: [],
-    }
-  }
-
-  return {
-    summary: {
-      totalProcessed,
-      paymentCount,
-      averageTicket: paymentCount > 0 ? Math.round(totalProcessed / paymentCount) : 0,
-    },
-    payments,
-  }
-}
-
-function formatCurrency(cents: number) {
-  return new Intl.NumberFormat('es-AR', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(cents / 100)
 }
 
 function formatPaymentDate(timestamp: number) {
@@ -148,6 +39,37 @@ function formatPaymentTime(timestamp: number) {
   }).format(new Date(timestamp * 1000))
 }
 
+function formatPayoutDate(timestamp: number) {
+  return new Intl.DateTimeFormat('es-AR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(new Date(timestamp * 1000))
+}
+
+function formatMonthTitle(monthKey: string) {
+  const [year, month] = monthKey.split('-').map(Number)
+
+  return new Intl.DateTimeFormat('es-AR', {
+    month: 'long',
+  }).format(new Date(year, month - 1, 1))
+}
+
+function getMonthOptions() {
+  const now = new Date()
+
+  return Array.from({ length: 12 }, (_, index) => {
+    const date = new Date(now.getFullYear(), now.getMonth() - index, 1)
+    const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+    const label = new Intl.DateTimeFormat('es-AR', {
+      month: 'long',
+      year: 'numeric',
+    }).format(date)
+
+    return { value, label }
+  })
+}
+
 function translatePaymentStatus(status: string) {
   if (status === 'succeeded') return 'Pagado'
   if (status === 'pending' || status === 'processing' || status === 'requires_confirmation' || status === 'requires_action') {
@@ -157,6 +79,16 @@ function translatePaymentStatus(status: string) {
   if (status === 'refunded') return 'Reembolsado'
 
   return 'Pendiente'
+}
+
+function translatePayoutStatus(status: string) {
+  if (status === 'pending') return 'Programada'
+  if (status === 'in_transit') return 'En camino'
+  if (status === 'paid') return 'Acreditada'
+  if (status === 'failed') return 'Fallida'
+  if (status === 'canceled') return 'Cancelada'
+
+  return status
 }
 
 function getStripeErrorMessage(error?: string) {
@@ -179,6 +111,46 @@ function translateMerchantStatus(status: MerchantStatus) {
   return 'Rechazado'
 }
 
+function formatCurrencyGroup(values: Record<string, number>) {
+  const entries = Object.entries(values)
+
+  if (entries.length === 0) return 'USD 0,00'
+
+  return entries.map(([currency, amount]) => formatStripeMoney(amount, currency)).join(' / ')
+}
+
+function renderNextPayout(result: NextPayoutResult) {
+  if (result.status === 'error') {
+    return (
+      <>
+        <strong style={headerMetricValueStyle}>No pudimos consultar la próxima acreditación.</strong>
+        <span style={headerMetricHelpStyle}>Intentá nuevamente más tarde.</span>
+      </>
+    )
+  }
+
+  if (result.status === 'missing_stripe' || !result.payout) {
+    return (
+      <>
+        <strong style={headerMetricValueStyle}>Sin fecha informada</strong>
+        <span style={headerMetricHelpStyle}>Stripe todavía no informó una nueva acreditación.</span>
+      </>
+    )
+  }
+
+  return (
+    <>
+      <strong style={headerMetricValueStyle}>{formatStripeMoney(result.payout.amount, result.payout.currency)}</strong>
+      <span style={headerMetricHelpStyle}>Estimada para el {formatPayoutDate(result.payout.arrivalDate)}</span>
+      <span style={statusPillStyle}>{translatePayoutStatus(result.payout.status)}</span>
+    </>
+  )
+}
+
+function renderAverageTicket(summary: MerchantMonthlySummary) {
+  return formatCurrencyGroup(summary.averageTicketByCurrency)
+}
+
 export default async function MerchantDashboardPage({ searchParams }: MerchantDashboardPageProps) {
   const params = await searchParams
   const stripeErrorMessage = getStripeErrorMessage(params?.stripe_error)
@@ -192,182 +164,180 @@ export default async function MerchantDashboardPage({ searchParams }: MerchantDa
   const paymentLink = getPaymentLink(merchant.slug)
   const hasStripeAccount = Boolean(merchant.stripeAccountId)
   const canAcceptPayments = canMerchantAcceptPayments(merchant)
-  const monthlyData = await getMonthlyDashboardData(merchant.slug, merchant.stripeAccountId)
-  const monthlySummary = monthlyData.summary
+  const [monthlyData, nextPayout] = await Promise.all([
+    getMonthlyDashboardData(merchant),
+    getNextMerchantPayout(merchant.stripeAccountId),
+  ])
+  const currentMonth = getCurrentMonthKey()
+  const currentMonthLabel = formatMonthTitle(currentMonth)
 
   return (
     <main style={pageStyle}>
       <section style={shellStyle}>
         <header style={headerStyle}>
-          <div>
-            <p style={eyebrowStyle}>Portal del Comercio</p>
+          <div style={titleBlockStyle}>
+            <p style={eyebrowStyle}>Portal del comercio</p>
             <h1 style={pageTitleStyle}>{merchant.name}</h1>
           </div>
           <div style={headerMetricStyle}>
-            <span style={headerMetricLabelStyle}>Cobrado este mes</span>
-            <strong style={headerMetricValueStyle}>{formatCurrency(monthlySummary.totalProcessed)}</strong>
+            <span style={headerMetricLabelStyle}>Próxima acreditación</span>
+            {renderNextPayout(nextPayout)}
           </div>
         </header>
 
         <section style={sectionStyle}>
           <div style={sectionHeaderStyle}>
             <div>
-              <p style={eyebrowStyle}>Gu&iacute;a inicial</p>
-              <h2 style={sectionTitleStyle}>Primeros pasos</h2>
+              <h2 style={sectionTitleStyle}>Ventas de {currentMonthLabel}</h2>
             </div>
-            <p style={sectionDescriptionStyle}>Prepar&aacute; Cobrix Pay para cobrar desde el celular y compartir tu QR.</p>
+            <p style={sectionDescriptionStyle}>
+              Ventas en la moneda original del cobro. Las acreditaciones bancarias usan la moneda informada por Stripe.
+            </p>
           </div>
 
-          <div style={stepsGridStyle}>
-            <div style={stepStyle}>
-              <span style={stepIconStyle}>&#10003;</span>
-              <div>
-                <h3 style={stepTitleStyle}>Instalar Cobrix Pay</h3>
-                <p style={stepTextStyle}>Agreg&aacute; el portal a la pantalla de inicio para abrirlo como una app.</p>
-              </div>
+          <div style={summaryGridStyle}>
+            <div style={summaryCardStyle}>
+              <p style={summaryLabelStyle}>Ventas del mes</p>
+              <strong style={summaryValueStyle}>{formatCurrencyGroup(monthlyData.summary.totalsByCurrency)}</strong>
             </div>
-            <div style={stepStyle}>
-              <span style={stepIconStyle}>&#10003;</span>
-              <div>
-                <h3 style={stepTitleStyle}>Descargar el QR</h3>
-                <p style={stepTextStyle}>Guard&aacute; el QR en PDF o PNG para imprimirlo o tenerlo siempre a mano.</p>
-              </div>
+            <div style={summaryCardStyle}>
+              <p style={summaryLabelStyle}>Cobros aprobados</p>
+              <strong style={summaryValueStyle}>{monthlyData.summary.approvedPaymentCount}</strong>
             </div>
-            <div style={stepStyle}>
-              <span style={stepIconStyle}>&#10003;</span>
-              <div>
-                <h3 style={stepTitleStyle}>Compartir el enlace</h3>
-                <p style={stepTextStyle}>Copi&aacute; el link permanente y envialo por WhatsApp, redes o email.</p>
-              </div>
-            </div>
-            <div style={stepStyle}>
-              <span style={stepIconStyle}>&#10003;</span>
-              <div>
-                <h3 style={stepTitleStyle}>Realizar un cobro de prueba</h3>
-                <p style={stepTextStyle}>Prob&aacute; el flujo completo para confirmar que tu comercio ya puede cobrar.</p>
-              </div>
+            <div style={summaryCardStyle}>
+              <p style={summaryLabelStyle}>Ticket promedio</p>
+              <strong style={summaryValueStyle}>{renderAverageTicket(monthlyData.summary)}</strong>
             </div>
           </div>
         </section>
 
-          <section style={sectionStyle}>
-            <div style={sectionHeaderStyle}>
+        <details style={detailsStyle}>
+          <summary style={detailsSummaryStyle}>Primeros pasos</summary>
+          <div style={stepsGridStyle}>
+            <div style={stepStyle}>
+              <span style={stepIconStyle}>1</span>
               <div>
-                <p style={eyebrowStyle}>Bloque 1</p>
-                <h2 style={sectionTitleStyle}>Resumen</h2>
-              </div>
-              <p style={sectionDescriptionStyle}>Desde el 1 del mes actual hasta hoy.</p>
-            </div>
-
-            <div style={summaryGridStyle}>
-              <div style={summaryCardStyle}>
-                <p style={summaryLabelStyle}>Total procesado</p>
-                <strong style={summaryValueStyle}>{formatCurrency(monthlySummary.totalProcessed)}</strong>
-              </div>
-              <div style={summaryCardStyle}>
-                <p style={summaryLabelStyle}>Cantidad de cobros</p>
-                <strong style={summaryValueStyle}>{monthlySummary.paymentCount}</strong>
-              </div>
-              <div style={summaryCardStyle}>
-                <p style={summaryLabelStyle}>Ticket promedio</p>
-                <strong style={summaryValueStyle}>{formatCurrency(monthlySummary.averageTicket)}</strong>
+                <h3 style={stepTitleStyle}>Instalar Cobrix Pay</h3>
+                <p style={stepTextStyle}>Agregá el portal a la pantalla de inicio para abrirlo como una app.</p>
               </div>
             </div>
-          </section>
-
-          <section style={sectionStyle}>
-            <div style={sectionHeaderStyle}>
+            <div style={stepStyle}>
+              <span style={stepIconStyle}>2</span>
               <div>
-                <p style={eyebrowStyle}>Bloque 2</p>
-                <h2 style={sectionTitleStyle}>Cobrar</h2>
+                <h3 style={stepTitleStyle}>Descargar el QR</h3>
+                <p style={stepTextStyle}>Guardá el QR en PDF o PNG para imprimirlo o tenerlo siempre a mano.</p>
               </div>
-              <p style={sectionDescriptionStyle}>Us&aacute; tu QR permanente o compart&iacute; el enlace de pago del comercio.</p>
             </div>
-            {!canAcceptPayments && (
-              <p style={accountNoticeStyle}>
-                Tu cuenta figura como {translateMerchantStatus(merchant.status)}. El enlace de pago se habilitara cuando
-                Cobrix Pay complete la revision y active el comercio.
+            <div style={stepStyle}>
+              <span style={stepIconStyle}>3</span>
+              <div>
+                <h3 style={stepTitleStyle}>Compartir el enlace</h3>
+                <p style={stepTextStyle}>Copiá el link permanente y envialo por WhatsApp, redes o email.</p>
+              </div>
+            </div>
+            <div style={stepStyle}>
+              <span style={stepIconStyle}>4</span>
+              <div>
+                <h3 style={stepTitleStyle}>Realizar un cobro de prueba</h3>
+                <p style={stepTextStyle}>Probá el flujo completo para confirmar que tu comercio ya puede cobrar.</p>
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <section style={sectionStyle}>
+          <div style={sectionHeaderStyle}>
+            <div>
+              <h2 style={sectionTitleStyle}>Cobrar con Cobrix Pay</h2>
+            </div>
+            <p style={sectionDescriptionStyle}>Usá tu QR permanente o compartí el enlace de pago del comercio.</p>
+          </div>
+          {!canAcceptPayments && (
+            <p style={accountNoticeStyle}>
+              Tu cuenta figura como {translateMerchantStatus(merchant.status)}. El enlace de pago se habilitara cuando
+              Cobrix Pay complete la revision y active el comercio.
+            </p>
+          )}
+          {canAcceptPayments && <DashboardActions merchantName={merchant.name} paymentLink={paymentLink} />}
+        </section>
+
+        <section style={sectionStyle}>
+          <div style={salesHeaderStyle}>
+            <div>
+              <h2 style={sectionTitleStyle}>Últimas ventas</h2>
+              <p style={{ ...sectionDescriptionStyle, marginTop: 8 }}>
+                Consultá los cobros registrados durante el mes actual.
               </p>
-            )}
-            {canAcceptPayments && <DashboardActions merchantName={merchant.name} paymentLink={paymentLink} />}
-          </section>
-
-          <section style={sectionStyle}>
-            <div style={sectionHeaderStyle}>
-              <div>
-                <p style={eyebrowStyle}>Bloque 3</p>
-                <h2 style={sectionTitleStyle}>Actividad</h2>
-              </div>
-              <p style={sectionDescriptionStyle}>Consult&aacute; los cobros registrados durante el mes actual.</p>
             </div>
+            <MonthlyReportActions months={getMonthOptions()} />
+          </div>
 
-            {monthlyData.payments.length > 0 ? (
-              <div style={{ marginTop: 16, overflowX: 'auto' }}>
-                <table style={paymentsTableStyle}>
-                  <thead>
-                    <tr>
-                      <th style={paymentsHeaderCellStyle}>Fecha</th>
-                      <th style={paymentsHeaderCellStyle}>Hora</th>
-                      <th style={paymentsHeaderCellStyle}>Monto</th>
-                      <th style={paymentsHeaderCellStyle}>Estado</th>
+          {monthlyData.payments.length > 0 ? (
+            <div style={tableScrollStyle}>
+              <table style={paymentsTableStyle}>
+                <thead>
+                  <tr>
+                    <th style={paymentsHeaderCellStyle}>Fecha</th>
+                    <th style={paymentsHeaderCellStyle}>Hora</th>
+                    <th style={paymentsHeaderCellStyle}>Monto</th>
+                    <th style={paymentsHeaderCellStyle}>Estado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {monthlyData.payments.map((payment) => (
+                    <tr key={payment.id}>
+                      <td style={paymentsCellStyle}>{formatPaymentDate(payment.created)}</td>
+                      <td style={paymentsCellStyle}>{formatPaymentTime(payment.created)}</td>
+                      <td style={paymentsCellStyle}>{formatStripeMoney(payment.amount, payment.currency)}</td>
+                      <td style={paymentsCellStyle}>{translatePaymentStatus(payment.status)}</td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {monthlyData.payments.map((payment) => (
-                      <tr key={payment.id}>
-                        <td style={paymentsCellStyle}>{formatPaymentDate(payment.created)}</td>
-                        <td style={paymentsCellStyle}>{formatPaymentTime(payment.created)}</td>
-                        <td style={paymentsCellStyle}>{formatCurrency(payment.amount)}</td>
-                        <td style={paymentsCellStyle}>{translatePaymentStatus(payment.status)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <p style={{ margin: '14px 0 0', color: '#5b6275' }}>
-                Todav&iacute;a no registr&aacute;s cobros este mes.
-                <br />
-                Cuando recibas tu primer pago aparecer&aacute; aqu&iacute;.
-              </p>
-            )}
-          </section>
-
-          <section style={sectionStyle}>
-            <div style={sectionHeaderStyle}>
-              <div>
-                <p style={eyebrowStyle}>Bloque 4</p>
-                <h2 style={sectionTitleStyle}>Mi Cuenta</h2>
-              </div>
-              <p style={sectionDescriptionStyle}>Acced&eacute; a la configuraci&oacute;n operativa de tu comercio.</p>
+                  ))}
+                </tbody>
+              </table>
             </div>
+          ) : (
+            <p style={emptyStateStyle}>
+              Todavía no registrás cobros este mes.
+              <br />
+              Cuando recibas tu primer pago aparecerá aquí.
+            </p>
+          )}
+        </section>
 
+        <section style={sectionStyle}>
+          <div style={sectionHeaderStyle}>
+            <div>
+              <h2 style={sectionTitleStyle}>Mi comercio</h2>
+            </div>
+            <p style={sectionDescriptionStyle}>Accedé a la configuración operativa de tu comercio.</p>
+          </div>
+
+          {!hasStripeAccount && (
+            <p style={accountNoticeStyle}>Completá la configuración de Stripe para poder recibir pagos.</p>
+          )}
+
+          {stripeErrorMessage && (
+            <p role="alert" style={accountErrorStyle}>
+              {stripeErrorMessage}
+            </p>
+          )}
+
+          <div style={accountActionsStyle}>
+            {hasStripeAccount && (
+              <a href="/api/stripe/express-login" style={primaryLinkStyle}>
+                Ver mi cuenta Stripe
+              </a>
+            )}
             {!hasStripeAccount && (
-              <p style={accountNoticeStyle}>Complet&aacute; la configuraci&oacute;n de Stripe para poder recibir pagos.</p>
+              <a
+                href={process.env.NEXT_PUBLIC_STRIPE_ONBOARDING_URL || 'mailto:notificaciones@cobrixpay.com?subject=Completar alta Stripe'}
+                style={secondaryLinkStyle}
+              >
+                Completar alta Stripe
+              </a>
             )}
-
-            {stripeErrorMessage && (
-              <p role="alert" style={accountErrorStyle}>
-                {stripeErrorMessage}
-              </p>
-            )}
-
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 18 }}>
-              {hasStripeAccount && (
-                <a href="/api/stripe/express-login" style={primaryLinkStyle}>
-                  Ver mi cuenta Stripe
-                </a>
-              )}
-              {!hasStripeAccount && (
-                <a
-                  href={process.env.NEXT_PUBLIC_STRIPE_ONBOARDING_URL || 'mailto:notificaciones@cobrixpay.com?subject=Completar alta Stripe'}
-                  style={secondaryLinkStyle}
-                >
-                  Completar alta Stripe
-                </a>
-              )}
-            </div>
-          </section>
+          </div>
+        </section>
       </section>
     </main>
   )
@@ -375,7 +345,7 @@ export default async function MerchantDashboardPage({ searchParams }: MerchantDa
 
 const pageStyle = {
   minHeight: '100vh',
-  padding: '32px 16px',
+  padding: '28px 14px',
   background: '#f5f7fb',
   color: '#171717',
 } satisfies React.CSSProperties
@@ -388,21 +358,30 @@ const shellStyle = {
 
 const headerStyle = {
   display: 'flex',
+  gap: 16,
   alignItems: 'stretch',
   justifyContent: 'space-between',
-  gap: 16,
   flexWrap: 'wrap',
-  marginBottom: 18,
+  marginBottom: 16,
+} satisfies React.CSSProperties
+
+const titleBlockStyle = {
+  flex: '1 1 300px',
+  minWidth: 0,
 } satisfies React.CSSProperties
 
 const pageTitleStyle = {
   margin: 0,
-  fontSize: 34,
-  lineHeight: 1.15,
+  fontSize: 'clamp(28px, 5vw, 38px)',
+  lineHeight: 1.12,
 } satisfies React.CSSProperties
 
 const headerMetricStyle = {
-  minWidth: 240,
+  display: 'grid',
+  gap: 8,
+  flex: '1 1 280px',
+  maxWidth: 380,
+  minWidth: 0,
   padding: 18,
   border: '1px solid #d7dce9',
   borderRadius: 8,
@@ -419,14 +398,29 @@ const headerMetricLabelStyle = {
 
 const headerMetricValueStyle = {
   display: 'block',
-  marginTop: 8,
-  fontSize: 30,
+  fontSize: 'clamp(22px, 4vw, 30px)',
   lineHeight: 1.1,
 } satisfies React.CSSProperties
 
+const headerMetricHelpStyle = {
+  color: '#e2e8f0',
+  fontSize: 14,
+  lineHeight: 1.45,
+} satisfies React.CSSProperties
+
+const statusPillStyle = {
+  justifySelf: 'start',
+  padding: '5px 9px',
+  borderRadius: 999,
+  background: '#e8f5e9',
+  color: '#1b5e20',
+  fontSize: 12,
+  fontWeight: 800,
+} satisfies React.CSSProperties
+
 const sectionStyle = {
-  marginTop: 16,
-  padding: 24,
+  marginTop: 14,
+  padding: 'clamp(16px, 3vw, 24px)',
   border: '1px solid #e2e5ee',
   borderRadius: 8,
   background: '#fff',
@@ -438,7 +432,16 @@ const sectionHeaderStyle = {
   justifyContent: 'space-between',
   gap: 16,
   flexWrap: 'wrap',
-  marginBottom: 18,
+  marginBottom: 16,
+} satisfies React.CSSProperties
+
+const salesHeaderStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'flex-start',
+  gap: 16,
+  flexWrap: 'wrap',
+  marginBottom: 16,
 } satisfies React.CSSProperties
 
 const eyebrowStyle = {
@@ -450,29 +453,45 @@ const eyebrowStyle = {
 } satisfies React.CSSProperties
 
 const sectionTitleStyle = {
-  margin: '4px 0 0',
-  fontSize: 24,
+  margin: 0,
+  fontSize: 'clamp(21px, 4vw, 26px)',
   lineHeight: 1.2,
 } satisfies React.CSSProperties
 
 const sectionDescriptionStyle = {
-  maxWidth: 360,
+  maxWidth: 430,
   margin: 0,
   color: '#5b6275',
   lineHeight: 1.5,
 } satisfies React.CSSProperties
 
+const detailsStyle = {
+  marginTop: 14,
+  padding: '16px clamp(16px, 3vw, 24px)',
+  border: '1px solid #e2e5ee',
+  borderRadius: 8,
+  background: '#fff',
+  boxShadow: '0 10px 30px rgba(23, 23, 23, 0.04)',
+} satisfies React.CSSProperties
+
+const detailsSummaryStyle = {
+  cursor: 'pointer',
+  fontSize: 20,
+  fontWeight: 800,
+} satisfies React.CSSProperties
+
 const stepsGridStyle = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
   gap: 12,
+  marginTop: 16,
 } satisfies React.CSSProperties
 
 const stepStyle = {
   display: 'flex',
   alignItems: 'flex-start',
   gap: 12,
-  padding: 16,
+  padding: 14,
   border: '1px solid #e2e5ee',
   borderRadius: 8,
   background: '#fbfcff',
@@ -486,8 +505,8 @@ const stepIconStyle = {
   height: 28,
   flex: '0 0 28px',
   borderRadius: 999,
-  background: '#11a36a',
-  color: '#fff',
+  background: '#eef2ff',
+  color: '#1455d9',
   fontWeight: 800,
 } satisfies React.CSSProperties
 
@@ -505,12 +524,13 @@ const stepTextStyle = {
 
 const summaryGridStyle = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
   gap: 12,
   marginTop: 16,
 } satisfies React.CSSProperties
 
 const summaryCardStyle = {
+  minWidth: 0,
   padding: 16,
   border: '1px solid #e2e5ee',
   borderRadius: 8,
@@ -526,14 +546,21 @@ const summaryLabelStyle = {
 const summaryValueStyle = {
   display: 'block',
   marginTop: 8,
-  fontSize: 28,
+  fontSize: 'clamp(22px, 4vw, 28px)',
   lineHeight: 1.2,
+  overflowWrap: 'anywhere',
+} satisfies React.CSSProperties
+
+const tableScrollStyle = {
+  marginTop: 16,
+  overflowX: 'auto',
+  WebkitOverflowScrolling: 'touch',
 } satisfies React.CSSProperties
 
 const paymentsTableStyle = {
   width: '100%',
   borderCollapse: 'collapse',
-  minWidth: 520,
+  minWidth: 540,
 } satisfies React.CSSProperties
 
 const paymentsHeaderCellStyle = {
@@ -548,6 +575,12 @@ const paymentsCellStyle = {
   padding: '12px 8px',
   borderBottom: '1px solid #eef1f7',
   textAlign: 'left',
+} satisfies React.CSSProperties
+
+const emptyStateStyle = {
+  margin: '14px 0 0',
+  color: '#5b6275',
+  lineHeight: 1.5,
 } satisfies React.CSSProperties
 
 const accountNoticeStyle = {
@@ -570,9 +603,17 @@ const accountErrorStyle = {
   fontWeight: 700,
 } satisfies React.CSSProperties
 
+const accountActionsStyle = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 10,
+  marginTop: 18,
+} satisfies React.CSSProperties
+
 const primaryLinkStyle = {
   display: 'inline-flex',
   alignItems: 'center',
+  minHeight: 44,
   padding: '10px 14px',
   borderRadius: 8,
   background: '#635bff',
@@ -584,6 +625,7 @@ const primaryLinkStyle = {
 const secondaryLinkStyle = {
   display: 'inline-flex',
   alignItems: 'center',
+  minHeight: 44,
   padding: '10px 14px',
   border: '1px solid #cfd4e2',
   borderRadius: 8,
