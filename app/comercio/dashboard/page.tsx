@@ -131,6 +131,23 @@ function renderNextPayout(result: NextPayoutResult) {
   }
 
   if (result.status === 'missing_stripe' || !result.payout) {
+    if (result.status === 'ok' && result.estimates && result.estimates.length > 0) {
+      const nextAvailableOn = result.estimates[0].availableOn
+
+      return (
+        <>
+          {result.estimates.map((estimate) => (
+            <strong key={`${estimate.currency}-${estimate.availableOn}`} style={summaryValueStyle}>
+              {formatStripeMoney(estimate.amount, estimate.currency)}
+            </strong>
+          ))}
+          <span style={payoutHelpStyle}>Fecha: {formatPayoutDate(nextAvailableOn)}</span>
+          <span style={statusPillStyle}>Estimación de Stripe</span>
+          <span style={payoutHelpStyle}>Fecha estimada según la disponibilidad informada por Stripe</span>
+        </>
+      )
+    }
+
     return (
       <>
         <strong style={summaryValueStyle}>Sin fecha informada</strong>

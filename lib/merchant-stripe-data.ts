@@ -28,8 +28,14 @@ export type MerchantPayout = {
   status: string
 }
 
+export type MerchantPayoutEstimate = {
+  amount: number
+  currency: string
+  availableOn: number
+}
+
 export type NextPayoutResult =
-  | { status: 'ok'; payout: MerchantPayout | null }
+  | { status: 'ok'; payout: MerchantPayout | null; estimates?: MerchantPayoutEstimate[] }
   | { status: 'missing_stripe' }
   | { status: 'error' }
 
@@ -179,6 +185,33 @@ function toMerchantPayout(payout: Stripe.Payout): MerchantPayout {
   }
 }
 
+function getNextPendingBalanceEstimates(balanceTransactions: Stripe.BalanceTransaction[]) {
+  const grouped = new Map<string, MerchantPayoutEstimate>()
+
+  balanceTransactions.forEach((balanceTransaction) => {
+    if (balanceTransaction.status !== 'pending') return
+    if (!balanceTransaction.available_on || !balanceTransaction.currency) return
+    if (!Number.isFinite(balanceTransaction.net) || balanceTransaction.net <= 0) return
+
+    const currency = balanceTransaction.currency.toLowerCase()
+    const key = `${currency}:${balanceTransaction.available_on}`
+    const current = grouped.get(key)
+
+    grouped.set(key, {
+      amount: (current?.amount || 0) + balanceTransaction.net,
+      currency,
+      availableOn: balanceTransaction.available_on,
+    })
+  })
+
+  const estimates = Array.from(grouped.values()).sort((a, b) => a.availableOn - b.availableOn)
+  const nextAvailableOn = estimates[0]?.availableOn
+
+  if (!nextAvailableOn) return []
+
+  return estimates.filter((estimate) => estimate.availableOn === nextAvailableOn)
+}
+
 export async function getNextMerchantPayout(stripeAccountId?: string): Promise<NextPayoutResult> {
   const stripe = getStripe()
 
@@ -209,7 +242,31 @@ export async function getNextMerchantPayout(stripeAccountId?: string): Promise<N
       }
     }
 
-    return { status: 'ok', payout: nextPayout ? toMerchantPayout(nextPayout) : null }
+    if (nextPayout) {
+      return { status: 'ok', payout: toMerchantPayout(nextPayout) }
+    }
+
+    const balanceTransactionList = stripe.balanceTransactions.list(
+      {
+        limit: 100,
+      },
+      {
+        stripeAccount: stripeAccountId,
+      }
+    )
+    const pendingBalanceTransactions: Stripe.BalanceTransaction[] = []
+
+    for await (const balanceTransaction of balanceTransactionList) {
+      if (balanceTransaction.status === 'pending') {
+        pendingBalanceTransactions.push(balanceTransaction)
+      }
+    }
+
+    return {
+      status: 'ok',
+      payout: null,
+      estimates: getNextPendingBalanceEstimates(pendingBalanceTransactions),
+    }
   } catch {
     return { status: 'error' }
   }
