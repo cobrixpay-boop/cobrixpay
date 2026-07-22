@@ -185,18 +185,29 @@ export async function getNextMerchantPayout(stripeAccountId?: string): Promise<N
   if (!stripe || !stripeAccountId) return { status: 'missing_stripe' }
 
   try {
-    const payouts = await stripe.payouts.list(
+    const windowStart = new Date()
+    windowStart.setDate(windowStart.getDate() - 90)
+    windowStart.setHours(0, 0, 0, 0)
+    const payoutList = stripe.payouts.list(
       {
+        arrival_date: {
+          // Keep active delayed payouts visible without scanning unbounded history.
+          gte: Math.floor(windowStart.getTime() / 1000),
+        },
         limit: 100,
       },
       {
         stripeAccount: stripeAccountId,
       }
     )
-    const nextPayout =
-      payouts.data
-        .filter((payout) => payout.status === 'pending' || payout.status === 'in_transit')
-        .sort((a, b) => a.arrival_date - b.arrival_date)[0] || null
+    let nextPayout: Stripe.Payout | null = null
+
+    for await (const payout of payoutList) {
+      if (payout.status !== 'pending' && payout.status !== 'in_transit') continue
+      if (!nextPayout || payout.arrival_date < nextPayout.arrival_date) {
+        nextPayout = payout
+      }
+    }
 
     return { status: 'ok', payout: nextPayout ? toMerchantPayout(nextPayout) : null }
   } catch {

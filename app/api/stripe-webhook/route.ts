@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { Resend } from 'resend'
 import { getMerchantBySlug } from '../../../lib/merchants'
+import { markPaymentLinkPaid } from '@/lib/payment-links'
+import { formatStripeMoney } from '@/lib/stripe-money'
 
 type PaymentIntentWithCharges = Stripe.PaymentIntent & {
   charges?: {
@@ -57,10 +59,6 @@ function getMerchantName(paymentIntent: Stripe.PaymentIntent, session?: Stripe.C
   return paymentIntent.metadata?.merchantName || session?.metadata?.merchantName
 }
 
-function formatAmount(amountInCents: number) {
-  return (amountInCents / 100).toFixed(2)
-}
-
 function formatPaymentDate(timestamp: number) {
   return new Intl.DateTimeFormat('es-AR', {
     dateStyle: 'short',
@@ -102,6 +100,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Webhook Error' }, { status: 400 })
   }
 
+  if (event.type !== 'payment_intent.succeeded' && event.type !== 'payment_intent.payment_failed') {
+    return NextResponse.json({ received: true })
+  }
+
   const paymentIntent = event.data.object as Stripe.PaymentIntent
   const checkoutSession = await getCheckoutSession(stripe, paymentIntent)
   const merchantSlug = await getMerchantSlug(stripe, paymentIntent, checkoutSession)
@@ -114,17 +116,23 @@ export async function POST(req: Request) {
       : [process.env.DEFAULT_MERCHANT_EMAIL || 'cobrixpay@gmail.com']
   const merchantName = merchant?.name || getMerchantName(paymentIntent, checkoutSession) || merchantSlug?.replace(/-/g, ' ') || 'Cobrix Pay'
   const buyerEmail = getBuyerEmail(paymentIntent, checkoutSession)
-  const amount = formatAmount(paymentIntent.amount)
+  const amount = formatStripeMoney(paymentIntent.amount_received || paymentIntent.amount, paymentIntent.currency)
   const paymentDate = formatPaymentDate(paymentIntent.created)
 
   if (event.type === 'payment_intent.succeeded') {
+    const paymentLinkId = paymentIntent.metadata?.paymentLinkId || checkoutSession?.metadata?.paymentLinkId
+
+    if (paymentLinkId) {
+      await markPaymentLinkPaid(paymentLinkId, paymentIntent.id)
+    }
+
     const merchantPromise = sendEmail(
       merchantEmails,
-      `Nuevo cobro recibido - USD ${amount}`,
+      `Nuevo cobro recibido - ${amount}`,
       `Nuevo cobro recibido
 
 Comercio: ${merchantName}
-Monto: USD ${amount}
+Monto: ${amount}
 Fecha y hora: ${paymentDate}
 ID de operación Stripe: ${paymentIntent.id}
 
@@ -141,7 +149,7 @@ Cobrix Pay`
 
 Tu pago a ${merchantName} fue procesado correctamente.
 
-Monto: USD ${amount}
+Monto: ${amount}
 Fecha y hora: ${paymentDate}
 ID de operación Stripe: ${paymentIntent.id}
 
@@ -160,7 +168,7 @@ Cobrix Pay`
     const failedMessage = `Pago no procesado
 
 Comercio: ${merchantName}
-Monto: USD ${amount}
+Monto: ${amount}
 Fecha y hora: ${paymentDate}
 ID de operación Stripe: ${paymentIntent.id}
 
@@ -169,11 +177,7 @@ Motivo: ${reason}
 
 Cobrix Pay`
 
-    const merchantPromise = sendEmail(
-      merchantEmails,
-      `Pago no procesado - USD ${amount}`,
-      failedMessage
-    )
+    const merchantPromise = sendEmail(merchantEmails, `Pago no procesado - ${amount}`, failedMessage)
 
     const buyerPromise = buyerEmail
       ? sendEmail(
@@ -183,7 +187,7 @@ Cobrix Pay`
 
 No pudimos procesar tu pago a ${merchantName}.
 
-Monto: USD ${amount}
+Monto: ${amount}
 Fecha y hora: ${paymentDate}
 ID de operación Stripe: ${paymentIntent.id}
 

@@ -1,5 +1,6 @@
 import { canMerchantAcceptPayments, getMerchantBySlug } from '@/lib/merchants'
 import { PayForm } from './PayForm'
+import { getMerchantCheckoutCurrency } from '@/lib/merchant-checkout-config'
 
 type PayPageProps = {
   params: Promise<{ slug: string }>
@@ -29,7 +30,7 @@ export default async function PayPage({ params, searchParams }: PayPageProps) {
     )
   }
 
-  return <PayForm slug={merchant.slug} initialAmount={query?.amount || ''} />
+  return <PayForm slug={merchant.slug} initialAmount={query?.amount || ''} currency={getMerchantCheckoutCurrency(merchant)} />
 }
 
 const pageStyle = {

@@ -4,6 +4,7 @@ import { DashboardActions } from './dashboard-actions'
 import { MonthlyReportActions } from './monthly-report-actions'
 import { getMerchantFromSession, MERCHANT_SESSION_COOKIE } from '@/lib/merchant-session'
 import { canMerchantAcceptPayments, type MerchantStatus } from '@/lib/merchants'
+import { getMerchantCheckoutCurrency } from '@/lib/merchant-checkout-config'
 import {
   getCurrentMonthKey,
   getMonthlyDashboardData,
@@ -42,7 +43,7 @@ function formatPaymentTime(timestamp: number) {
 function formatPayoutDate(timestamp: number) {
   return new Intl.DateTimeFormat('es-AR', {
     day: '2-digit',
-    month: '2-digit',
+    month: 'long',
     year: 'numeric',
   }).format(new Date(timestamp * 1000))
 }
@@ -82,8 +83,8 @@ function translatePaymentStatus(status: string) {
 }
 
 function translatePayoutStatus(status: string) {
-  if (status === 'pending') return 'Programada'
-  if (status === 'in_transit') return 'En camino'
+  if (status === 'pending') return 'Pendiente'
+  if (status === 'in_transit') return 'En tránsito'
   if (status === 'paid') return 'Acreditada'
   if (status === 'failed') return 'Fallida'
   if (status === 'canceled') return 'Cancelada'
@@ -93,7 +94,7 @@ function translatePayoutStatus(status: string) {
 
 function getStripeErrorMessage(error?: string) {
   if (error === 'missing_account') {
-    return 'Tu comercio todavia no tiene una cuenta Stripe conectada.'
+    return 'Tu comercio todavía no tiene una cuenta Stripe conectada.'
   }
 
   if (error === 'login_link_failed') {
@@ -104,17 +105,17 @@ function getStripeErrorMessage(error?: string) {
 }
 
 function translateMerchantStatus(status: MerchantStatus) {
-  if (status === 'pending_documents') return 'Documentacion pendiente'
-  if (status === 'under_review') return 'En revision'
+  if (status === 'pending_documents') return 'Documentación pendiente'
+  if (status === 'under_review') return 'En revisión'
   if (status === 'active') return 'Activo'
   if (status === 'suspended') return 'Suspendido'
   return 'Rechazado'
 }
 
-function formatCurrencyGroup(values: Record<string, number>) {
+function formatCurrencyGroup(values: Record<string, number>, fallbackCurrency: string) {
   const entries = Object.entries(values)
 
-  if (entries.length === 0) return 'USD 0,00'
+  if (entries.length === 0) return formatStripeMoney(0, fallbackCurrency)
 
   return entries.map(([currency, amount]) => formatStripeMoney(amount, currency)).join(' / ')
 }
@@ -123,8 +124,8 @@ function renderNextPayout(result: NextPayoutResult) {
   if (result.status === 'error') {
     return (
       <>
-        <strong style={headerMetricValueStyle}>No pudimos consultar la próxima acreditación.</strong>
-        <span style={headerMetricHelpStyle}>Intentá nuevamente más tarde.</span>
+        <strong style={summaryValueStyle}>Sin fecha informada</strong>
+        <span style={payoutHelpStyle}>No pudimos consultar la próxima acreditación.</span>
       </>
     )
   }
@@ -132,23 +133,24 @@ function renderNextPayout(result: NextPayoutResult) {
   if (result.status === 'missing_stripe' || !result.payout) {
     return (
       <>
-        <strong style={headerMetricValueStyle}>Sin fecha informada</strong>
-        <span style={headerMetricHelpStyle}>Stripe todavía no informó una nueva acreditación.</span>
+        <strong style={summaryValueStyle}>Sin fecha informada</strong>
+        <span style={payoutHelpStyle}>Stripe todavía no informó una próxima acreditación.</span>
       </>
     )
   }
 
   return (
     <>
-      <strong style={headerMetricValueStyle}>{formatStripeMoney(result.payout.amount, result.payout.currency)}</strong>
-      <span style={headerMetricHelpStyle}>Estimada para el {formatPayoutDate(result.payout.arrivalDate)}</span>
+      <strong style={summaryValueStyle}>{formatStripeMoney(result.payout.amount, result.payout.currency)}</strong>
+      <span style={payoutHelpStyle}>Moneda: {result.payout.currency.toUpperCase()}</span>
+      <span style={payoutHelpStyle}>Fecha: {formatPayoutDate(result.payout.arrivalDate)}</span>
       <span style={statusPillStyle}>{translatePayoutStatus(result.payout.status)}</span>
     </>
   )
 }
 
-function renderAverageTicket(summary: MerchantMonthlySummary) {
-  return formatCurrencyGroup(summary.averageTicketByCurrency)
+function renderAverageTicket(summary: MerchantMonthlySummary, fallbackCurrency: string) {
+  return formatCurrencyGroup(summary.averageTicketByCurrency, fallbackCurrency)
 }
 
 export default async function MerchantDashboardPage({ searchParams }: MerchantDashboardPageProps) {
@@ -164,6 +166,7 @@ export default async function MerchantDashboardPage({ searchParams }: MerchantDa
   const paymentLink = getPaymentLink(merchant.slug)
   const hasStripeAccount = Boolean(merchant.stripeAccountId)
   const canAcceptPayments = canMerchantAcceptPayments(merchant)
+  const checkoutCurrency = getMerchantCheckoutCurrency(merchant)
   const [monthlyData, nextPayout] = await Promise.all([
     getMonthlyDashboardData(merchant),
     getNextMerchantPayout(merchant.stripeAccountId),
@@ -178,10 +181,6 @@ export default async function MerchantDashboardPage({ searchParams }: MerchantDa
           <div style={titleBlockStyle}>
             <p style={eyebrowStyle}>Portal del comercio</p>
             <h1 style={pageTitleStyle}>{merchant.name}</h1>
-          </div>
-          <div style={headerMetricStyle}>
-            <span style={headerMetricLabelStyle}>Próxima acreditación</span>
-            {renderNextPayout(nextPayout)}
           </div>
         </header>
 
@@ -198,7 +197,7 @@ export default async function MerchantDashboardPage({ searchParams }: MerchantDa
           <div style={summaryGridStyle}>
             <div style={summaryCardStyle}>
               <p style={summaryLabelStyle}>Ventas del mes</p>
-              <strong style={summaryValueStyle}>{formatCurrencyGroup(monthlyData.summary.totalsByCurrency)}</strong>
+              <strong style={summaryValueStyle}>{formatCurrencyGroup(monthlyData.summary.totalsByCurrency, checkoutCurrency)}</strong>
             </div>
             <div style={summaryCardStyle}>
               <p style={summaryLabelStyle}>Cobros aprobados</p>
@@ -206,7 +205,11 @@ export default async function MerchantDashboardPage({ searchParams }: MerchantDa
             </div>
             <div style={summaryCardStyle}>
               <p style={summaryLabelStyle}>Ticket promedio</p>
-              <strong style={summaryValueStyle}>{renderAverageTicket(monthlyData.summary)}</strong>
+              <strong style={summaryValueStyle}>{renderAverageTicket(monthlyData.summary, checkoutCurrency)}</strong>
+            </div>
+            <div style={payoutSummaryCardStyle}>
+              <p style={summaryLabelStyle}>Próxima acreditación</p>
+              {renderNextPayout(nextPayout)}
             </div>
           </div>
         </section>
@@ -254,11 +257,13 @@ export default async function MerchantDashboardPage({ searchParams }: MerchantDa
           </div>
           {!canAcceptPayments && (
             <p style={accountNoticeStyle}>
-              Tu cuenta figura como {translateMerchantStatus(merchant.status)}. El enlace de pago se habilitara cuando
-              Cobrix Pay complete la revision y active el comercio.
+              Tu cuenta figura como {translateMerchantStatus(merchant.status)}. El enlace de pago se habilitará cuando
+              Cobrix Pay complete la revisión y active el comercio.
             </p>
           )}
-          {canAcceptPayments && <DashboardActions merchantName={merchant.name} paymentLink={paymentLink} />}
+          {canAcceptPayments && (
+            <DashboardActions merchantName={merchant.name} paymentLink={paymentLink} checkoutCurrency={checkoutCurrency} />
+          )}
         </section>
 
         <section style={sectionStyle}>
@@ -376,48 +381,6 @@ const pageTitleStyle = {
   lineHeight: 1.12,
 } satisfies React.CSSProperties
 
-const headerMetricStyle = {
-  display: 'grid',
-  gap: 8,
-  flex: '1 1 280px',
-  maxWidth: 380,
-  minWidth: 0,
-  padding: 18,
-  border: '1px solid #d7dce9',
-  borderRadius: 8,
-  background: '#151a2d',
-  color: '#fff',
-} satisfies React.CSSProperties
-
-const headerMetricLabelStyle = {
-  display: 'block',
-  color: '#cbd5e1',
-  fontSize: 13,
-  fontWeight: 700,
-} satisfies React.CSSProperties
-
-const headerMetricValueStyle = {
-  display: 'block',
-  fontSize: 'clamp(22px, 4vw, 30px)',
-  lineHeight: 1.1,
-} satisfies React.CSSProperties
-
-const headerMetricHelpStyle = {
-  color: '#e2e8f0',
-  fontSize: 14,
-  lineHeight: 1.45,
-} satisfies React.CSSProperties
-
-const statusPillStyle = {
-  justifySelf: 'start',
-  padding: '5px 9px',
-  borderRadius: 999,
-  background: '#e8f5e9',
-  color: '#1b5e20',
-  fontSize: 12,
-  fontWeight: 800,
-} satisfies React.CSSProperties
-
 const sectionStyle = {
   marginTop: 14,
   padding: 'clamp(16px, 3vw, 24px)',
@@ -524,7 +487,7 @@ const stepTextStyle = {
 
 const summaryGridStyle = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(158px, 1fr))',
   gap: 12,
   marginTop: 16,
 } satisfies React.CSSProperties
@@ -535,6 +498,12 @@ const summaryCardStyle = {
   border: '1px solid #e2e5ee',
   borderRadius: 8,
   background: '#fff',
+} satisfies React.CSSProperties
+
+const payoutSummaryCardStyle = {
+  ...summaryCardStyle,
+  border: '1px solid #b9c6ff',
+  boxShadow: 'inset 4px 0 0 #635bff',
 } satisfies React.CSSProperties
 
 const summaryLabelStyle = {
@@ -549,6 +518,25 @@ const summaryValueStyle = {
   fontSize: 'clamp(22px, 4vw, 28px)',
   lineHeight: 1.2,
   overflowWrap: 'anywhere',
+} satisfies React.CSSProperties
+
+const payoutHelpStyle = {
+  display: 'block',
+  marginTop: 6,
+  color: '#475569',
+  fontSize: 14,
+  lineHeight: 1.4,
+} satisfies React.CSSProperties
+
+const statusPillStyle = {
+  display: 'inline-flex',
+  marginTop: 8,
+  padding: '5px 9px',
+  borderRadius: 999,
+  background: '#e8f5e9',
+  color: '#1b5e20',
+  fontSize: 12,
+  fontWeight: 800,
 } satisfies React.CSSProperties
 
 const tableScrollStyle = {

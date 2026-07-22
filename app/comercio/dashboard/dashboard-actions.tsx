@@ -3,10 +3,19 @@
 import QRCode from 'qrcode'
 import { QRCodeCanvas } from 'qrcode.react'
 import { jsPDF } from 'jspdf'
+import { useState } from 'react'
 
 type DashboardActionsProps = {
   merchantName: string
   paymentLink: string
+  checkoutCurrency: string
+}
+
+type CreatedPaymentLink = {
+  url: string
+  amount: string
+  currency: string
+  expiresAt: string
 }
 
 const COBRIX_BLUE = '#1455d9'
@@ -165,9 +174,76 @@ async function drawFooterBranding(pdf: jsPDF, centerX: number, pageHeight: numbe
   }
 }
 
-export function DashboardActions({ merchantName, paymentLink }: DashboardActionsProps) {
+function formatExpiration(value: string) {
+  return new Intl.DateTimeFormat('es-AR', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value))
+}
+
+export function DashboardActions({ merchantName, paymentLink, checkoutCurrency }: DashboardActionsProps) {
+  const [showFixedLinkForm, setShowFixedLinkForm] = useState(false)
+  const [fixedAmount, setFixedAmount] = useState('')
+  const [fixedConcept, setFixedConcept] = useState('')
+  const [createdLink, setCreatedLink] = useState<CreatedPaymentLink | null>(null)
+  const [fixedLinkError, setFixedLinkError] = useState('')
+  const [fixedLinkLoading, setFixedLinkLoading] = useState(false)
+
   async function copyPaymentLink() {
     await navigator.clipboard.writeText(paymentLink)
+  }
+
+  async function copyFixedPaymentLink() {
+    if (!createdLink) return
+    await navigator.clipboard.writeText(createdLink.url)
+  }
+
+  async function shareFixedPaymentLink() {
+    if (!createdLink) return
+
+    const shareText = `Link de pago ${createdLink.amount} generado por ${merchantName}.`
+
+    if (navigator.share) {
+      await navigator.share({
+        title: `Pago a ${merchantName}`,
+        text: shareText,
+        url: createdLink.url,
+      })
+      return
+    }
+
+    await navigator.clipboard.writeText(createdLink.url)
+  }
+
+  async function createFixedPaymentLink() {
+    setFixedLinkError('')
+    setCreatedLink(null)
+    setFixedLinkLoading(true)
+
+    try {
+      const response = await fetch('/api/payment-links', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: Number(fixedAmount),
+          concept: fixedConcept,
+        }),
+      })
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        throw new Error(data.error || 'No se pudo generar el link.')
+      }
+
+      setCreatedLink(data)
+    } catch (error: unknown) {
+      setFixedLinkError(error instanceof Error ? error.message : 'No se pudo generar el link.')
+    } finally {
+      setFixedLinkLoading(false)
+    }
   }
 
   async function downloadPng() {
@@ -235,7 +311,72 @@ export function DashboardActions({ merchantName, paymentLink }: DashboardActions
         <button type="button" onClick={downloadPng} style={secondaryButtonStyle}>
           Descargar QR PNG
         </button>
+        <button type="button" onClick={() => setShowFixedLinkForm((current) => !current)} style={secondaryButtonStyle}>
+          Crear link de pago
+        </button>
       </div>
+
+      {showFixedLinkForm && (
+        <div style={fixedLinkPanelStyle}>
+          <div style={fixedLinkGridStyle}>
+            <label style={fieldStyle}>
+              <span style={fieldLabelStyle}>Monto</span>
+              <input
+                type="number"
+                min="0.01"
+                step="0.01"
+                required
+                value={fixedAmount}
+                onChange={(event) => setFixedAmount(event.target.value)}
+                placeholder="Ej: 25.00"
+                style={inputStyle}
+              />
+            </label>
+            <label style={fieldStyle}>
+              <span style={fieldLabelStyle}>Moneda</span>
+              <input value={checkoutCurrency.toUpperCase()} readOnly style={inputStyle} />
+            </label>
+            <label style={{ ...fieldStyle, gridColumn: '1 / -1' }}>
+              <span style={fieldLabelStyle}>Concepto opcional</span>
+              <input
+                value={fixedConcept}
+                onChange={(event) => setFixedConcept(event.target.value)}
+                maxLength={120}
+                placeholder="Ej: Reserva, seña o factura"
+                style={inputStyle}
+              />
+            </label>
+          </div>
+
+          {fixedLinkError && (
+            <p role="alert" style={fixedLinkErrorStyle}>
+              {fixedLinkError}
+            </p>
+          )}
+
+          <button type="button" onClick={createFixedPaymentLink} disabled={fixedLinkLoading} style={fixedLinkLoading ? disabledButtonStyle : primaryButtonStyle}>
+            {fixedLinkLoading ? 'Generando...' : 'Generar link'}
+          </button>
+
+          {createdLink && (
+            <div style={createdLinkStyle}>
+              <p style={paymentLinkLabelStyle}>URL generada</p>
+              <p style={paymentLinkStyle}>{createdLink.url}</p>
+              <p style={fixedLinkMetaStyle}>
+                {createdLink.amount} fijado por el comercio. Vence el {formatExpiration(createdLink.expiresAt)}.
+              </p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 10, marginTop: 12 }}>
+                <button type="button" onClick={copyFixedPaymentLink} style={secondaryButtonStyle}>
+                  Copiar link
+                </button>
+                <button type="button" onClick={shareFixedPaymentLink} style={secondaryButtonStyle}>
+                  Compartir
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </section>
   )
 }
@@ -294,5 +435,76 @@ const secondaryButtonStyle = {
   background: '#fff',
   color: '#171717',
   cursor: 'pointer',
+  fontWeight: 700,
+} satisfies React.CSSProperties
+
+const disabledButtonStyle = {
+  ...primaryButtonStyle,
+  background: '#9ca3af',
+  borderColor: '#9ca3af',
+  cursor: 'not-allowed',
+} satisfies React.CSSProperties
+
+const fixedLinkPanelStyle = {
+  margin: '18px auto 0',
+  maxWidth: 620,
+  padding: 16,
+  border: '1px solid #d7dce9',
+  borderRadius: 8,
+  background: '#fbfcff',
+  textAlign: 'left',
+} satisfies React.CSSProperties
+
+const fixedLinkGridStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+  gap: 12,
+} satisfies React.CSSProperties
+
+const fieldStyle = {
+  display: 'grid',
+  gap: 6,
+} satisfies React.CSSProperties
+
+const fieldLabelStyle = {
+  color: '#5b6275',
+  fontSize: 13,
+  fontWeight: 800,
+} satisfies React.CSSProperties
+
+const inputStyle = {
+  minHeight: 44,
+  width: '100%',
+  padding: '10px 12px',
+  border: '1px solid #cfd4e2',
+  borderRadius: 8,
+  background: '#fff',
+  color: '#171717',
+  fontSize: 16,
+} satisfies React.CSSProperties
+
+const fixedLinkErrorStyle = {
+  margin: '12px 0',
+  padding: 12,
+  border: '1px solid #f0b7c1',
+  borderRadius: 8,
+  background: '#fff5f7',
+  color: '#b00020',
+  fontWeight: 700,
+} satisfies React.CSSProperties
+
+const createdLinkStyle = {
+  marginTop: 14,
+  padding: 12,
+  border: '1px solid #e2e5ee',
+  borderRadius: 8,
+  background: '#fff',
+  textAlign: 'center',
+} satisfies React.CSSProperties
+
+const fixedLinkMetaStyle = {
+  margin: '8px 0 0',
+  color: '#475569',
+  lineHeight: 1.45,
   fontWeight: 700,
 } satisfies React.CSSProperties

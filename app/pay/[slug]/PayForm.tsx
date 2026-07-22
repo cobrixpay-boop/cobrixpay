@@ -5,9 +5,10 @@ import { useState } from 'react'
 type PayFormProps = {
   slug: string
   initialAmount: string
+  currency: string
 }
 
-export function PayForm({ slug, initialAmount }: PayFormProps) {
+export function PayForm({ slug, initialAmount, currency }: PayFormProps) {
   const [amount, setAmount] = useState<string>(initialAmount)
   const [loading, setLoading] = useState(false)
 
@@ -15,7 +16,7 @@ export function PayForm({ slug, initialAmount }: PayFormProps) {
     const numAmount = Number(amount)
 
     if (!amount || numAmount <= 0) {
-      alert('Ingresa un importe valido en USD (mayor a 0)')
+      alert(`Ingresa un importe valido en ${currency.toUpperCase()} (mayor a 0)`)
       return
     }
 
@@ -57,7 +58,9 @@ export function PayForm({ slug, initialAmount }: PayFormProps) {
         Comercio: {slug.replace(/-/g, ' ').toUpperCase()}
       </p>
 
-      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>Monto en USD</label>
+      <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+        Monto en {currency.toUpperCase()}
+      </label>
       <input
         type="number"
         placeholder="Ej: 25.00"
