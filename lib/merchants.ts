@@ -80,6 +80,8 @@ export type Merchant = {
   stripeAccountId?: string
   postPaymentUrl?: string
   whatsapp?: string
+  supportEmail?: string
+  supportPhone?: string
   status: MerchantStatus
   archived: boolean
   archivedReason?: 'admin' | 'compliance'
@@ -195,6 +197,8 @@ function normalizeMerchantRecord(merchant: StoredMerchant, key: string): Merchan
     stripeAccountId: merchant.stripeAccountId,
     postPaymentUrl: optionalString(merchant.postPaymentUrl),
     whatsapp: optionalString(merchant.whatsapp),
+    supportEmail: optionalString(merchant.supportEmail),
+    supportPhone: optionalString(merchant.supportPhone),
     status: normalizeMerchantStatus(merchant.status),
     archived: merchant.archived === true,
     archivedReason:

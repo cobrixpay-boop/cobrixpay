@@ -28,6 +28,18 @@ function normalizeOptionalString(value: unknown) {
   return String(value).trim()
 }
 
+function isValidSupportEmail(value: string) {
+  if (!value) return true
+  if (value.length > 120) return false
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+}
+
+function isValidSupportPhone(value: string) {
+  if (!value) return true
+  if (value.length > 40) return false
+  return /^\+?[0-9][0-9\s().-]{5,39}$/.test(value)
+}
+
 function normalizeApplicationFeePercent(value: unknown) {
   if (value === undefined || value === null || value === '') return 0
   const parsed = Number(value)
@@ -142,6 +154,8 @@ export async function POST(req: Request) {
       const applicationFeePercent = normalizeApplicationFeePercent(body.applicationFeePercent)
       const salesRepName = normalizeOptionalString(body.salesRepName)
       const source = normalizeOptionalString(body.source)
+      const supportEmail = normalizeOptionalString(body.supportEmail)
+      const supportPhone = normalizeOptionalString(body.supportPhone)
 
       if (!name || !email || !whatsapp || !slug) {
         return NextResponse.json({ error: 'Faltan campos para crear la invitacion.' }, { status: 400 })
@@ -149,6 +163,14 @@ export async function POST(req: Request) {
 
       if (Number.isNaN(applicationFeePercent)) {
         return NextResponse.json({ error: 'La comision debe ser un numero.' }, { status: 400 })
+      }
+
+      if (!isValidSupportEmail(supportEmail)) {
+        return NextResponse.json({ error: 'El email publico de consultas no tiene un formato valido.' }, { status: 400 })
+      }
+
+      if (!isValidSupportPhone(supportPhone)) {
+        return NextResponse.json({ error: 'El telefono publico debe incluir un numero internacional valido.' }, { status: 400 })
       }
 
       const existingMerchant = merchants[slug]
@@ -167,6 +189,8 @@ export async function POST(req: Request) {
         everActive: existingMerchant?.everActive,
         stripeAccountId: existingMerchant?.stripeAccountId,
         applicationFeePercent,
+        supportEmail: supportEmail || existingMerchant?.supportEmail,
+        supportPhone: supportPhone || existingMerchant?.supportPhone,
         salesRepName: salesRepName || existingMerchant?.salesRepName,
         source: source || existingMerchant?.source,
         onboarding: {

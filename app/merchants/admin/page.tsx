@@ -12,6 +12,8 @@ type Merchant = {
   stripeAccountId?: string
   postPaymentUrl?: string
   whatsapp?: string
+  supportEmail?: string
+  supportPhone?: string
   status: MerchantStatus
   archived: boolean
   archivedReason?: 'admin' | 'compliance'
@@ -95,6 +97,8 @@ export default function AdminMerchants() {
   const [status, setStatus] = useState<MerchantStatus>('pending_documents')
   const [postPaymentUrl, setPostPaymentUrl] = useState('')
   const [whatsapp, setWhatsapp] = useState('')
+  const [supportEmail, setSupportEmail] = useState('')
+  const [supportPhone, setSupportPhone] = useState('')
   const [applicationFeePercent, setApplicationFeePercent] = useState('0')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
@@ -108,6 +112,8 @@ export default function AdminMerchants() {
   const [inviteFee, setInviteFee] = useState('0')
   const [inviteSalesRep, setInviteSalesRep] = useState('')
   const [inviteSource, setInviteSource] = useState('')
+  const [inviteSupportEmail, setInviteSupportEmail] = useState('')
+  const [inviteSupportPhone, setInviteSupportPhone] = useState('')
   const [lastInvitationLinks, setLastInvitationLinks] = useState<Record<string, string>>({})
   const [selectedRegistrationSlug, setSelectedRegistrationSlug] = useState('')
 
@@ -174,6 +180,8 @@ export default function AdminMerchants() {
     setStatus(merchant.status)
     setPostPaymentUrl(merchant.postPaymentUrl || '')
     setWhatsapp(merchant.whatsapp || '')
+    setSupportEmail(merchant.supportEmail || '')
+    setSupportPhone(merchant.supportPhone || '')
     setApplicationFeePercent(String(merchant.applicationFeePercent || 0))
     setMessage(`Editando comercio: ${merchant.slug}`)
   }
@@ -188,6 +196,8 @@ export default function AdminMerchants() {
     setStatus('pending_documents')
     setPostPaymentUrl('')
     setWhatsapp('')
+    setSupportEmail('')
+    setSupportPhone('')
     setApplicationFeePercent('0')
   }
 
@@ -215,6 +225,8 @@ export default function AdminMerchants() {
           status,
           postPaymentUrl,
           whatsapp,
+          supportEmail,
+          supportPhone,
           applicationFeePercent,
         }),
       })
@@ -395,6 +407,8 @@ export default function AdminMerchants() {
           applicationFeePercent: inviteFee,
           salesRepName: inviteSalesRep,
           source: inviteSource,
+          supportEmail: inviteSupportEmail,
+          supportPhone: inviteSupportPhone,
         }),
       })
       const data = await res.json()
@@ -412,6 +426,8 @@ export default function AdminMerchants() {
       setInviteFee('0')
       setInviteSalesRep('')
       setInviteSource('')
+      setInviteSupportEmail('')
+      setInviteSupportPhone('')
       setMessage(
         data.emailSent
           ? `Invitacion enviada y enlace copiado: ${data.merchant.slug}`
@@ -558,7 +574,18 @@ export default function AdminMerchants() {
               <span style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>Canal interno</span>
               <input value={inviteSource} onChange={(e) => setInviteSource(e.target.value)} style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid #ccc' }} />
             </label>
+            <label>
+              <span style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>Email publico para consultas</span>
+              <input value={inviteSupportEmail} onChange={(e) => setInviteSupportEmail(e.target.value)} type="email" maxLength={120} placeholder="contacto@comercio.com" style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid #ccc' }} />
+            </label>
+            <label>
+              <span style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>Telefono publico para consultas</span>
+              <input value={inviteSupportPhone} onChange={(e) => setInviteSupportPhone(e.target.value)} type="tel" maxLength={40} placeholder="+54 9 11 1234-5678" style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid #ccc' }} />
+            </label>
           </div>
+          <small style={{ display: 'block', marginTop: 8, color: '#666' }}>
+            Estos datos apareceran en el correo de confirmacion enviado al comprador.
+          </small>
           <button
             type="submit"
             disabled={loading}
@@ -673,6 +700,29 @@ export default function AdminMerchants() {
             placeholder="+54 9 11 1234-5678"
             style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid #ccc' }}
           />
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>Email publico para consultas de compradores</label>
+          <input
+            value={supportEmail}
+            onChange={(e) => setSupportEmail(e.target.value)}
+            type="email"
+            maxLength={120}
+            placeholder="contacto@comercio.com"
+            style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid #ccc' }}
+          />
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>Telefono publico para consultas de compradores</label>
+          <input
+            value={supportPhone}
+            onChange={(e) => setSupportPhone(e.target.value)}
+            type="tel"
+            maxLength={40}
+            placeholder="+54 9 11 1234-5678"
+            style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid #ccc' }}
+          />
+          <small style={{ color: '#666' }}>Estos datos apareceran en el correo de confirmacion enviado al comprador.</small>
         </div>
         <div style={{ marginBottom: 12 }}>
           <label style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>Comision Cobrix (%)</label>
@@ -798,6 +848,8 @@ export default function AdminMerchants() {
                 {merchant.stripeAccountId && <div style={{ color: '#555' }}>Stripe: {merchant.stripeAccountId}</div>}
                 {merchant.postPaymentUrl && <div style={{ color: '#555' }}>URL post-pago: {merchant.postPaymentUrl}</div>}
                 {merchant.whatsapp && <div style={{ color: '#555' }}>WhatsApp: {merchant.whatsapp}</div>}
+                {merchant.supportEmail && <div style={{ color: '#555' }}>Email publico compradores: {merchant.supportEmail}</div>}
+                {merchant.supportPhone && <div style={{ color: '#555' }}>Telefono publico compradores: {merchant.supportPhone}</div>}
                 <div style={{ color: '#555' }}>Comision Cobrix: {merchant.applicationFeePercent || 0}%</div>
                 <div style={{ color: '#555' }}>slug: {merchant.slug}</div>
                 <div style={{ color: '#555' }}>link: {baseUrl}/pay/{merchant.slug}</div>

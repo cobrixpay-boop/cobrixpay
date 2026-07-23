@@ -51,6 +51,18 @@ function normalizeOptionalString(value: unknown) {
   return String(value).trim()
 }
 
+function isValidSupportEmail(value: string) {
+  if (!value) return true
+  if (value.length > 120) return false
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+}
+
+function isValidSupportPhone(value: string) {
+  if (!value) return true
+  if (value.length > 40) return false
+  return /^\+?[0-9][0-9\s().-]{5,39}$/.test(value)
+}
+
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : undefined
 }
@@ -191,6 +203,8 @@ export async function POST(req: Request) {
       applicationFeePercent,
       postPaymentUrl,
       whatsapp,
+      supportEmail,
+      supportPhone,
       status,
       archived,
     } = body
@@ -201,6 +215,8 @@ export async function POST(req: Request) {
     const normalizedApplicationFeePercent = normalizeApplicationFeePercent(applicationFeePercent)
     const normalizedPostPaymentUrl = normalizeOptionalString(postPaymentUrl)
     const normalizedWhatsapp = normalizeOptionalString(whatsapp)
+    const normalizedSupportEmail = normalizeOptionalString(supportEmail)
+    const normalizedSupportPhone = normalizeOptionalString(supportPhone)
 
     if (!normalizedSlug || !normalizedName || !normalizedEmail) {
       return NextResponse.json({ error: 'Faltan campos' }, { status: 400 })
@@ -235,6 +251,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'La URL despues del pago debe empezar con http:// o https://' }, { status: 400 })
     }
 
+    if (!isValidSupportEmail(normalizedSupportEmail)) {
+      return NextResponse.json({ error: 'El email publico de consultas no tiene un formato valido.' }, { status: 400 })
+    }
+
+    if (!isValidSupportPhone(normalizedSupportPhone)) {
+      return NextResponse.json({ error: 'El telefono publico debe incluir un numero internacional valido.' }, { status: 400 })
+    }
+
     const parsedNotificationEmails = normalizeNotificationEmails(notificationEmails, normalizedEmail)
 
     const merchant: Merchant = {
@@ -250,6 +274,8 @@ export async function POST(req: Request) {
       applicationFeePercent: normalizedApplicationFeePercent,
       ...(normalizedPostPaymentUrl ? { postPaymentUrl: normalizedPostPaymentUrl } : {}),
       ...(normalizedWhatsapp ? { whatsapp: normalizedWhatsapp } : {}),
+      ...(normalizedSupportEmail ? { supportEmail: normalizedSupportEmail } : {}),
+      ...(normalizedSupportPhone ? { supportPhone: normalizedSupportPhone } : {}),
     }
 
     if (normalizedStripeAccountId) {
@@ -264,6 +290,14 @@ export async function POST(req: Request) {
 
     if (!normalizedWhatsapp) {
       delete merchant.whatsapp
+    }
+
+    if (!normalizedSupportEmail) {
+      delete merchant.supportEmail
+    }
+
+    if (!normalizedSupportPhone) {
+      delete merchant.supportPhone
     }
 
     await saveMerchant(merchant)
