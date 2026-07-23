@@ -38,6 +38,59 @@
   font-size: 13px;
 }
 
+.headerStatus {
+  display: grid;
+  gap: 3px;
+  flex: 0 0 auto;
+  max-width: 320px;
+  padding: 12px 14px;
+  border: 1px solid #d7deec;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #475467;
+}
+
+.headerStatus span {
+  color: #067647;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.headerStatus strong {
+  color: #151a2d;
+  font-size: 14px;
+}
+
+.headerStatus small {
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.unavailableCard {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  max-width: 1180px;
+  margin: 0 auto 16px;
+  padding: 16px;
+  border: 1px solid #fedf89;
+  border-radius: 8px;
+  background: #fffbeb;
+  color: #93370d;
+}
+
+.unavailableCard strong {
+  display: block;
+  color: #7a2e0e;
+}
+
+.unavailableCard p {
+  margin: 4px 0 0;
+  line-height: 1.45;
+}
+
 .copilotCard,
 .panel,
 .milestone {
@@ -175,6 +228,49 @@
   letter-spacing: 0;
 }
 
+.currencyLines {
+  display: grid;
+  gap: 4px;
+}
+
+.currencyLines span {
+  display: block;
+}
+
+.noData {
+  color: #667085;
+}
+
+.secondaryMetricGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.secondaryMetric {
+  min-height: 76px;
+  padding: 12px;
+  border: 1px solid #e3e8f2;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.secondaryMetric span,
+.unallocatedBox span {
+  display: block;
+  color: #667085;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.secondaryMetric strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 16px;
+  line-height: 1.25;
+}
+
 .emptyText,
 .mutedText,
 .positiveText,
@@ -222,6 +318,20 @@
   height: 100%;
   border-radius: inherit;
   background: #11a37f;
+}
+
+.unallocatedBox {
+  margin-top: 18px;
+  padding: 14px;
+  border: 1px solid #fedf89;
+  border-radius: 8px;
+  background: #fffbeb;
+}
+
+.unallocatedBox .currencyLines {
+  margin-top: 8px;
+  color: #93370d;
+  font-weight: 800;
 }
 
 .opportunityList {
@@ -289,7 +399,7 @@
 
 .table {
   width: 100%;
-  min-width: 1040px;
+  min-width: 1380px;
   border-collapse: collapse;
   font-size: 14px;
 }
@@ -350,13 +460,18 @@
     width: fit-content;
   }
 
+  .headerStatus {
+    max-width: none;
+  }
+
   .copilotCard {
     grid-template-columns: 1fr;
     padding: 20px;
   }
 
   .grid,
-  .metricGrid {
+  .metricGrid,
+  .secondaryMetricGrid {
     grid-template-columns: 1fr;
   }
 
